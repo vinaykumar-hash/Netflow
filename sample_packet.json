@@ -1,0 +1,102 @@
+[
+  {
+    "_index": "packets-2026-02-12",
+    "_type": "doc",
+    "_score": null,
+    "_source": {
+      "layers": {
+        "frame": {
+          "frame.section_number": "1",
+          "frame.interface_id": "0",
+          "frame.interface_id_tree": {
+            "frame.interface_name": "\\Device\\NPF_{47686A15-E87D-44CD-B5AD-3B82BC9CF648}",
+            "frame.interface_description": "Wi-Fi"
+          },
+          "frame.encap_type": "1",
+          "frame.time": "Feb 12, 2026 10:27:54.248601000 UTC",
+          "frame.time_utc": "Feb 12, 2026 10:27:54.248601000 UTC",
+          "frame.time_epoch": "1770892074.248601000",
+          "frame.offset_shift": "0.000000000",
+          "frame.time_delta": "0.000000000",
+          "frame.time_delta_displayed": "0.000000000",
+          "frame.time_relative": "0.000000000",
+          "frame.number": "1",
+          "frame.len": "85",
+          "frame.cap_len": "85",
+          "frame.marked": "0",
+          "frame.ignored": "0",
+          "frame.protocols": "eth:ethertype:ipv6:udp:data"
+        },
+        "eth": {
+          "eth.dst": "2c:3b:70:fa:c3:bf",
+          "eth.dst_tree": {
+            "eth.dst_resolved": "AzureWaveTec_fa:c3:bf",
+            "eth.dst.oui": "2898800",
+            "eth.dst.oui_resolved": "AzureWave Technology Inc.",
+            "eth.addr": "2c:3b:70:fa:c3:bf",
+            "eth.addr_resolved": "AzureWaveTec_fa:c3:bf",
+            "eth.addr.oui": "2898800",
+            "eth.addr.oui_resolved": "AzureWave Technology Inc.",
+            "eth.dst.lg": "0",
+            "eth.lg": "0",
+            "eth.dst.ig": "0",
+            "eth.ig": "0"
+          },
+          "eth.src": "bc:51:5f:24:da:ed",
+          "eth.src_tree": {
+            "eth.src_resolved": "bc:51:5f:24:da:ed",
+            "eth.src.oui": "12341599",
+            "eth.addr": "bc:51:5f:24:da:ed",
+            "eth.addr_resolved": "bc:51:5f:24:da:ed",
+            "eth.addr.oui": "12341599",
+            "eth.src.lg": "0",
+            "eth.lg": "0",
+            "eth.src.ig": "0",
+            "eth.ig": "0"
+          },
+          "eth.type": "0x86dd"
+        },
+        "ipv6": {
+          "ipv6.version": "6",
+          "ip.version": "6",
+          "ipv6.tclass": "0x000000b8",
+          "ipv6.tclass_tree": {
+            "ipv6.tclass.dscp": "46",
+            "ipv6.tclass.ecn": "0"
+          },
+          "ipv6.flow": "0x000000",
+          "ipv6.plen": "31",
+          "ipv6.nxt": "17",
+          "ipv6.hlim": "59",
+          "ipv6.src": "2404:6800:4007:808::2003",
+          "ipv6.addr": "2404:6800:4007:808::2003",
+          "ipv6.src_host": "2404:6800:4007:808::2003",
+          "ipv6.host": "2404:6800:4007:808::2003",
+          "ipv6.dst": "2401:4900:88cd:35fb:3dce:b857:898:d7d6",
+          "ipv6.addr": "2401:4900:88cd:35fb:3dce:b857:898:d7d6",
+          "ipv6.dst_host": "2401:4900:88cd:35fb:3dce:b857:898:d7d6",
+          "ipv6.host": "2401:4900:88cd:35fb:3dce:b857:898:d7d6"
+        },
+        "udp": {
+          "udp.srcport": "443",
+          "udp.dstport": "57431",
+          "udp.port": "443",
+          "udp.port": "57431",
+          "udp.length": "31",
+          "udp.checksum": "0x88db",
+          "udp.checksum.status": "2",
+          "udp.stream": "0",
+          "Timestamps": {
+            "udp.time_relative": "0.000000000",
+            "udp.time_delta": "0.000000000"
+          },
+          "udp.payload": "4b:8e:4d:53:69:c6:6e:3c:a2:d2:9e:89:d4:fe:57:f4:9f:b3:bb:6c:01:f8:62"
+        },
+        "data": {
+          "data.data": "4b:8e:4d:53:69:c6:6e:3c:a2:d2:9e:89:d4:fe:57:f4:9f:b3:bb:6c:01:f8:62",
+          "data.len": "23"
+        }
+      }
+    }
+  }
+]
