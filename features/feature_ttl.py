@@ -1,4 +1,4 @@
-def analyze_ttl(ttl_list, threshold=5.0):
+def analyze_ttl(ttl_list, threshold=5.0) -> str | None:
     import numpy as np
     # Filter out None and ensure they are floats
     try:

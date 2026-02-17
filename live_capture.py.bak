@@ -1,10 +1,9 @@
 import subprocess
-import json
+import requests
 import threading
 import queue
 import time
 import sys
-import os
 
 # Field mapping consistent with PacketSchema in main.py
 FIELDS = [
@@ -47,51 +46,50 @@ FIELD_MAP = [
     "payload_len_udp", "info"
 ]
 
-OUTPUT_FILE = "live_data/stream.jsonl"
-packet_queue = queue.Queue(maxsize=100000)
+API_URL = "http://localhost:9000/"
+# Increased queue size to handle larger bursts
+packet_queue = queue.Queue(maxsize=50000) 
+NUM_WORKERS = 20
 
-def file_writer_worker():
-    """Reads packets from queue and writes to JSONL file with buffering."""
-    print(f"Writer thread started. Writing to {OUTPUT_FILE}...")
+def sender_worker(worker_id):
+    """Reads packets from the queue and sends them to the Pathway API using a persistent session."""
+    session = requests.Session()
+    # Adapter to allow more connections in the pool
+    adapter = requests.adapters.HTTPAdapter(pool_connections=NUM_WORKERS, pool_maxsize=NUM_WORKERS)
+    session.mount("http://", adapter)
     
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    # print(f"Worker {worker_id} started.")
     
-    # Open file in append mode. 
-    # Buffering=1 means line buffered, ensuring data hits disk reasonably fast but not too slow.
-    with open(OUTPUT_FILE, "a", buffering=1) as f:
-        while True:
-            try:
-                # Get a batch if possible, or blocking get one
-                packet = packet_queue.get()
-                if packet is None: 
-                    break
+    while True:
+        try:
+            packet = packet_queue.get() 
+            if packet is None: # Sentinel to stop
+                break
                 
-                # Write immediately (buffering handles the I/O optimization)
-                f.write(json.dumps(packet) + "\n")
+            try:
+                # Use session for connection pooling
+                # Short timeout to fail fast if server is overloaded
+                session.post(API_URL, json=packet, timeout=0.2)
+            except requests.exceptions.RequestException:
+                # In high-throughput scenarios, some drops are acceptable to keep fresh data coming
+                pass
+            finally:
                 packet_queue.task_done()
                 
-                # Optional: Drain queue if many items are waiting to do bulk write?
-                # For now, line buffering is safe and fast enough for ~50k/sec locally.
-                
-            except Exception as e:
-                print(f"Writer error: {e}", file=sys.stderr)
+        except Exception as e:
+            print(f"Worker {worker_id} error: {e}", file=sys.stderr)
 
 def monitor_worker():
     """Prints queue statistics periodically."""
     while True:
         time.sleep(3)
         q_size = packet_queue.qsize()
-        if q_size > 1000:
+        if q_size > 100:
             print(f"[Monitor] Queue Size: {q_size} / {packet_queue.maxsize}")
-        if q_size > 80000:
-            print("[Monitor] WARNING: Queue critical! Disk I/O may be too slow.")
+        if q_size > 40000:
+            print("[Monitor] WARNING: Queue near capacity! Packets may be dropped.")
 
 def main():
-    # Rotate log file at startup
-    if os.path.exists(OUTPUT_FILE):
-        os.rename(OUTPUT_FILE, f"{OUTPUT_FILE}.bak")
-    
     cmd = [
         "tshark", 
         "-i", "lo", 
@@ -102,11 +100,15 @@ def main():
     for f in FIELDS:
         cmd.extend(["-e", f])
 
-    print("Starting Sentinel Live Capture (File Streaming Mode)...")
-    
-    # Start writer thread
-    writer = threading.Thread(target=file_writer_worker, daemon=True)
-    writer.start()
+    print(f"Starting Sentinel Live Capture (Multi-threaded: {NUM_WORKERS} workers)...")
+    print(f"Streaming packets to Pathway at {API_URL}")
+
+    # Start worker threads
+    workers = []
+    for i in range(NUM_WORKERS):
+        t = threading.Thread(target=sender_worker, args=(i,), daemon=True)
+        t.start()
+        workers.append(t)
 
     # Start monitor thread
     monitor = threading.Thread(target=monitor_worker, daemon=True)
@@ -162,11 +164,16 @@ def main():
                     ) else "No"
                 }
 
-                # Push to queue
+                if processed["dst_port"] == "8055" or processed["src_port"] == "8055":
+                    # Only print every 100th debug message to reduce console spam
+                    pass 
+                
+                # Push to queue instead of blocking send
                 try:
                     packet_queue.put_nowait(processed)
                 except queue.Full:
-                    # print("Queue full!", file=sys.stderr)
+                    # Drop packet if queue is full to prevent tshark blocking
+                    # print("Queue full, dropping packet", file=sys.stderr)
                     pass
 
             except Exception:
@@ -175,8 +182,9 @@ def main():
     except KeyboardInterrupt:
         print("\nStopping Live Capture.")
         process.terminate()
-        packet_queue.put(None) 
-        writer.join(timeout=1.0)
+        # Signal workers to stop
+        for _ in range(NUM_WORKERS):
+            packet_queue.put(None) 
             
     except Exception as e:
         print(f"Capture error: {e}")

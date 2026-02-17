@@ -5,14 +5,19 @@ import signal
 import sys
 
 def start():
-    root = "/home/vinay/testing"
-    venv_python = f"{root}/.venv_web/bin/python"
-    daphne = f"{root}/.venv_web/bin/daphne"
+    root = os.getcwd()
+    venv_python = f"{root}/.venv/bin/python"
+    daphne = f"{root}/.venv/bin/daphne"
     
     # 1. Cleanup
     print("--- Sentinel Orchestrator ---")
     print("Stopping existing services...")
+    # Kill known ports
     subprocess.run("lsof -ti:5173,8000,8011 | xargs kill -9", shell=True, stderr=subprocess.DEVNULL)
+    # Kill orphaned capture scripts
+    subprocess.run("pkill -f live_capture.py", shell=True, stderr=subprocess.DEVNULL)
+    # Kill orphaned tshark
+    subprocess.run("pkill -f tshark", shell=True, stderr=subprocess.DEVNULL)
     
     # Reset live data to avoid processing old packets
     live_data = f"{root}/docs/live_packets.json"
@@ -34,17 +39,24 @@ def start():
     )
 
     # 3. Start Live Capture
-    print("Launching Live Capture (tshark)...")
-    capture_proc = subprocess.Popen(
-        [venv_python, f"{root}/live_capture.py"],
-        stdout=open(f"{root}/capture.log", "w"),
-        stderr=subprocess.STDOUT
-    )
+    import shutil
+    tshark_path = shutil.which("tshark")
+    if tshark_path:
+        print("Launching Live Capture (tshark)...")
+        capture_proc = subprocess.Popen(
+            [venv_python, f"{root}/live_capture.py"],
+            stdout=open(f"{root}/capture.log", "w"),
+            stderr=subprocess.STDOUT
+        )
+    else:
+        print("Warning: tshark not found. Skipping Live Capture.")
+        capture_proc = None
 
     # 4. Start Pathway Engine
     print("Launching Pathway Engine (Port 8011)...")
     time.sleep(5) # Give Django time to bind
-    engine_env = {**os.environ, "RUST_BACKTRACE": "1"}
+    # Force offline mode to use cached models
+    engine_env = {**os.environ, "RUST_BACKTRACE": "1", "HF_HUB_OFFLINE": "1"}
     pathway_proc = subprocess.Popen(
         [venv_python, f"{root}/main.py"],
         stdout=open(f"{root}/pathway.log", "w"),
@@ -68,10 +80,11 @@ def start():
     
     procs = {
         "Django": django_proc,
-        "Capture": capture_proc,
         "Pathway": pathway_proc,
         "Vite": vite_proc
     }
+    if capture_proc:
+        procs["Capture"] = capture_proc
 
     try:
         while True:

@@ -12,4 +12,11 @@ dependencies = [
     "sentence-transformers>=5.2.2",
     "unstructured>=0.18.31",
     "xai>=0.3.0",
+    "daphne>=4.0.0",
+    "channels>=4.0.0",
+    "djangorestframework>=3.14.0",
+    "django-cors-headers>=4.0.0",
+    "spicy>=0.16.0",
+    "numpy>=2.3.5",
+    "scipy>=1.17.0",
 ]

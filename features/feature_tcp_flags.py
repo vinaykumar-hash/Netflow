@@ -1,4 +1,8 @@
-def detect_abnormal_flags(syn, ack, fin, rst, psh, urg):
+def detect_abnormal_flags(protocols, syn, ack, fin, rst, psh, urg) -> str | None:
+    # Only analyze TCP packets
+    if not protocols or "tcp" not in str(protocols).lower():
+        return None
+
     # Convert string flags to boolean if necessary
     def to_bool(val):
         if isinstance(val, bool): return val
@@ -17,6 +21,9 @@ def detect_abnormal_flags(syn, ack, fin, rst, psh, urg):
         return "SYN+RST"
     if f_fin and f_rst:
         return "FIN+RST"
+    
+    # NULL Scan check: Must be effectively empty flags on a TCP packet
+    # Ensure at least we checked that it IS TCP above.
     if not any([f_syn, f_ack, f_fin, f_rst, f_psh, f_urg]):
         return "NULL_SCAN"
     if f_fin and f_psh and f_urg:

@@ -42,16 +42,11 @@ class PacketSchema(pw.Schema):
     fragmentation: str | None
 
 # 1. Read Raw Packets
-# webserver = pw.io.http.PathwayWebserver(host="0.0.0.0", port=9000)
-# packets, _ = pw.io.http.rest_connector(
-#     webserver=webserver,
-#     schema=PacketSchema,
-#     autocommit_duration_ms=50
-# )
-packets = pw.io.jsonlines.read(
-    "live_data/stream.jsonl",
+webserver = pw.io.http.PathwayWebserver(host="0.0.0.0", port=9000)
+packets, _ = pw.io.http.rest_connector(
+    webserver=webserver,
     schema=PacketSchema,
-    mode="streaming"
+    autocommit_duration_ms=50
 )
 # pw.io.csv.write(packets, filename="docs/raw_packets.csv")
 
@@ -122,8 +117,8 @@ def check_anomaly(
     # 1. SYN Flood / Port Scan
     # Increase threshold to 500 for local high-traffic bursts
     rate = packet_count / max(duration, 0.001)
-    # if(packet_count > 10):
-    #     reasons.append("Potential SYN Flood / Scan")
+    if(packet_count > 10):
+        reasons.append("Potential SYN Flood / Scan")
     if rate > 20 and mean_size < 100:
         reasons.append("Potential SYN Flood / Scan")
 
@@ -171,15 +166,15 @@ def safe_flags_stub(*args) -> str:
 # 2. Add individual packet features
 packets = packets.select(
     *pw.this,
-    abnormal_flags = pw.apply(
-        detect_abnormal_flags,
-        pw.this.protocols,
-        pw.this.tcp_flags_syn, pw.this.tcp_flags_ack, pw.this.tcp_flags_fin, 
-        pw.this.tcp_flags_rst, pw.this.tcp_flags_psh, pw.this.tcp_flags_urg
-    ),
-    # abnormal_flags = "OK",
-    # is_encrypted="Unknown"
-    is_encrypted = pw.apply(get_encryption_label, pw.this.protocols, pw.this.dst_port)
+    # abnormal_flags = pw.apply(
+    #     detect_abnormal_flags,
+    #     pw.this.protocols,
+    #     pw.this.tcp_flags_syn, pw.this.tcp_flags_ack, pw.this.tcp_flags_fin, 
+    #     pw.this.tcp_flags_rst, pw.this.tcp_flags_psh, pw.this.tcp_flags_urg
+    # ),
+    abnormal_flags = "OK",
+    is_encrypted="Unknown"
+    # is_encrypted = pw.apply(get_encryption_label, pw.this.protocols, pw.this.dst_port)
 )
 # pw.io.csv.write(packets, filename="docs/raw_packets.csv")
 
@@ -265,8 +260,8 @@ def anomaly_score(packet_count, mean_size, total_bytes, duration):
     rate = packet_count / max(duration, 0.001)
 
     score = 0.0
-    # if packet_count > 5:
-    #     return 1.0
+    if packet_count > 5:
+        return 1.0
     if packet_count > 50 and mean_size < 120:
         score += 0.4
 
