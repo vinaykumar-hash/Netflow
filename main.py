@@ -53,7 +53,27 @@ packets = pw.io.jsonlines.read(
     schema=PacketSchema,
     mode="streaming"
 )
+# Drop localhost and self-IP traffic early
+# packets = packets.filter(
+#     (pw.this.src_port == pw.this.dst_port)
+#     (pw.this.src_ip != "127.0.0.1") &
+#     (pw.this.dst_ip != "127.0.0.1")
+# )
+
 # pw.io.csv.write(packets, filename="docs/raw_packets.csv")
+
+# Log all raw traffic for debugging
+pw.io.csv.write(
+    packets.select(
+        pw.this.timestamp,
+        pw.this.src_ip,
+        pw.this.dst_ip,
+        pw.this.src_port,
+        pw.this.dst_port,
+        pw.this.protocols
+    ),
+    filename="logs/all_packets.csv"
+)
 
 # Load Whitelist Configuration
 WHITELIST = {"ips": [], "ports": []}
@@ -65,9 +85,10 @@ if os.path.exists("whitelist.json"):
 @pw.udf
 def is_whitelisted(src_ip: str | None, dst_ip: str | None, src_port: str | None, dst_port: str | None) -> bool:
     # 1. Whitelist Localhost and Link-Local (IPv6)
-    if src_ip and (src_ip == "::1" or src_ip.startswith("fe80:") or src_ip.startswith("ff02:")):
+    # 1. Whitelist Link-Local (IPv6) - keep localhost separate
+    if src_ip and (src_ip.startswith("fe80:") or src_ip.startswith("ff02:")):
         return True
-    if dst_ip and (dst_ip == "::1" or dst_ip.startswith("fe80:") or dst_ip.startswith("ff02:")):
+    if dst_ip and (dst_ip.startswith("fe80:") or dst_ip.startswith("ff02:")):
         return True
         
     # 2. Whitelist Broadcast/Multicast
@@ -236,16 +257,34 @@ flow_stats = packets_with_key.groupby(pw.this.flow_key).windowby(
     src_port=pw.reducers.max(pw.this.src_port),
     dst_port=pw.reducers.max(pw.this.dst_port),
     is_encrypted=pw.reducers.max(pw.this.is_encrypted),
+    flow_key=pw.reducers.max(pw.this.flow_key),
 )
 
 
 # Unpack logic
+@pw.udf
+def get_sip(key: tuple) -> str:
+    return key[0]
+
+@pw.udf
+def get_sport(key: tuple) -> str:
+    return key[1]
+
+@pw.udf
+def get_dip(key: tuple) -> str:
+    return key[2]
+
+@pw.udf
+def get_dport(key: tuple) -> str:
+    return key[3]
+
+# Unpack logic
 flow_features = flow_stats.select(
     flow_id=format_flow_id_udf(
-        pw.this.src_ip,
-        pw.this.dst_ip,
-        pw.this.src_port,
-        pw.this.dst_port
+        get_sip(pw.this.flow_key),
+        get_dip(pw.this.flow_key),
+        get_sport(pw.this.flow_key),
+        get_dport(pw.this.flow_key)
     ),
     duration=pw.this.max_time - pw.this.min_time+0.001,
     packet_count=pw.this.packet_count,
@@ -253,11 +292,52 @@ flow_features = flow_stats.select(
     mean_size=pw.this.mean_size,
     event_time=pw.this.event_time,
 
-    src_ip=pw.this.src_ip,
-    dst_ip=pw.this.dst_ip,
-    src_port=pw.this.src_port,
-    dst_port=pw.this.dst_port,
+    src_ip=get_sip(pw.this.flow_key),
+    dst_ip=get_dip(pw.this.flow_key),
+    src_port=get_sport(pw.this.flow_key),
+    dst_port=get_dport(pw.this.flow_key),
     is_encrypted=pw.this.is_encrypted
+).filter(
+    pw.this.src_port != pw.this.dst_port
+)
+@pw.udf(return_type=bool)
+def is_internal_ip(ip: str | None) -> bool:
+    if not ip:
+        return False
+    return (
+        ip == "127.0.0.1" or
+        ip == "::1" or
+        ip.startswith("192.168.") or
+        ip.startswith("10.") or
+        ip.startswith("172.16.") or
+        ip.startswith("172.17.") or
+        ip.startswith("172.18.") or
+        ip.startswith("172.19.") or
+        ip.startswith("172.20.") or
+        ip.startswith("172.21.") or
+        ip.startswith("172.22.") or
+        ip.startswith("172.23.") or
+        ip.startswith("172.24.") or
+        ip.startswith("172.25.") or
+        ip.startswith("172.26.") or
+        ip.startswith("172.27.") or
+        ip.startswith("172.28.") or
+        ip.startswith("172.29.") or
+        ip.startswith("172.30.") or
+        ip.startswith("172.31.")
+    )
+flows_internal = flow_features.select(
+    *pw.this,
+    is_internal_target=is_internal_ip(pw.this.dst_ip),
+    whitelisted=is_whitelisted(pw.this.src_ip, pw.this.dst_ip, pw.this.src_port, pw.this.dst_port)
+)
+threshold_flows = flows_internal.filter(
+    (pw.this.is_internal_target) &
+    (
+        (pw.this.packet_count > 50) |
+        (pw.this.total_bytes > 50000) |
+        (pw.this.duration > 3.0)
+    )
 )
 
 @pw.udf(return_type=float)
@@ -379,8 +459,7 @@ flow_pulse = flow_analysis.windowby(
     flow=pw.reducers.max(pw.this.flow_id), 
     last_packet_time=pw.reducers.max(pw.this.event_time),
     encryption=pw.reducers.max(pw.this.is_encrypted),
-
-
+    whitelisted=pw.reducers.max(pw.this.whitelisted),
 )
 
 
@@ -388,10 +467,86 @@ flow_pulse = flow_analysis.windowby(
 # anomalous_pulse = flow_pulse.filter(
 #     pw.this.anomaly_score > 0.5
 # )
-anomalous_pulse = flow_pulse
+# anomalous_pulse = flow_pulse.filter(~pw.this.whitelisted)
+anomalous_pulse = flow_pulse.filter(
+    (pw.this.anomaly_score >= 0.0) & (~pw.this.whitelisted)
+)
+port_monitor = flows_internal.filter(
+    pw.this.is_internal_target & (~pw.this.whitelisted)
+).groupby(
+    pw.this.dst_ip,
+    pw.this.dst_port
+).windowby(
+    pw.this.event_time,
+    window=pw.temporal.sliding(hop=1.0, duration=5.0),
+).reduce(
+    target=pw.reducers.max(pw.this.dst_ip),
+    port=pw.reducers.max(pw.this.dst_port),
+    packets=pw.reducers.sum(pw.this.packet_count),
+    bytes=pw.reducers.sum(pw.this.total_bytes),
+    event_time=pw.reducers.max(pw.this.event_time),
+)
+port_alerts = port_monitor.filter(
+    pw.this.packets > 0
+)
 
 pw.io.http.write(
     anomalous_pulse,
+    url="http://localhost:8000/api/update/",
+    method="POST",
+    headers={"Content-Type": "application/json"}
+)
+
+# --- Graph Edge Aggregation ---
+# Group traffic by (source, target, port) to visualize connections
+# Window: 10s sliding (smoother graph updates)
+graph_edges = flows_with_whitelist.filter(
+    ~pw.this.whitelisted
+).groupby(
+    pw.this.src_ip, pw.this.src_port, pw.this.dst_ip, pw.this.dst_port
+).windowby(
+    pw.this.event_time,
+    window=pw.temporal.sliding(hop=2.0, duration=10.0),
+).reduce(
+    src_ip=pw.reducers.max(pw.this.src_ip),
+    src_port=pw.reducers.max(pw.this.src_port),
+    dst_ip=pw.reducers.max(pw.this.dst_ip),
+    dst_port=pw.reducers.max(pw.this.dst_port),
+    weight=pw.reducers.sum(pw.this.packet_count),
+).select(
+    source=pw.apply(lambda ip, port: f"{ip}:{port}", pw.this.src_ip, pw.this.src_port),
+    target=pw.apply(lambda ip, port: f"{ip}:{port}", pw.this.dst_ip, pw.this.dst_port),
+    dst_port=pw.this.dst_port,
+    weight=pw.this.weight,
+    type=pw.apply(lambda _: "graph_edge", pw.this.weight), # Tag for frontend
+).filter(
+    pw.this.weight > 0 # Filter noise (low packet counts)
+)
+
+pw.io.csv.write(
+    graph_edges,
+    filename="logs/debug_graph_edges.csv"
+)
+
+# Stream Graph Updates to same endpoint
+pw.io.http.write(
+    graph_edges,
+    url="http://localhost:8000/api/update/",
+    method="POST",
+    headers={"Content-Type": "application/json"}
+)
+# ------------------------------
+port_alerts_stream = port_alerts.select(
+    target=pw.this.target,
+    port=pw.this.port,
+    packets=pw.this.packets,
+    bytes=pw.this.bytes,
+    time=pw.this.event_time,
+    type=pw.apply(lambda _: "port_alert", pw.this.port)
+)
+
+pw.io.http.write(
+    port_alerts_stream,
     url="http://localhost:8000/api/update/",
     method="POST",
     headers={"Content-Type": "application/json"}

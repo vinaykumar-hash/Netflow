@@ -83,6 +83,16 @@ def start():
         "Pathway": pathway_proc,
         "Vite": vite_proc
     }
+
+    # 6. Start System Monitor
+    print("Launching System Monitor...")
+    monitor_proc = subprocess.Popen(
+        [venv_python, f"{root}/system_monitor.py"],
+        stdout=open(f"{root}/monitor.log", "w"),
+        stderr=subprocess.STDOUT
+    )
+    procs["SystemMonitor"] = monitor_proc
+
     if capture_proc:
         procs["Capture"] = capture_proc
 
