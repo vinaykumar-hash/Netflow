@@ -94,9 +94,8 @@ def main():
     
     cmd = [
         "tshark", 
-        "-i", "lo", 
+        "-i", "wlo1", 
         "-l", 
-        "-f", "not port 9000 and not port 8011",
         "-T", "fields"
     ]
     for f in FIELDS:
@@ -112,11 +111,16 @@ def main():
     monitor = threading.Thread(target=monitor_worker, daemon=True)
     monitor.start()
 
+    active_targets = []
+    last_targets_check = 0.0
+    last_targets_mtime = 0.0
+    TARGETS_FILE = "active_targets.json"
+
     try:
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=sys.stderr,
             text=True
         )
 
@@ -162,6 +166,30 @@ def main():
                     ) else "No"
                 }
 
+                # Dynamically update active targets config at most once per second
+                current_time = time.time()
+                if current_time - last_targets_check > 1.0:
+                    last_targets_check = current_time
+                    if os.path.exists(TARGETS_FILE):
+                        try:
+                            mtime = os.path.getmtime(TARGETS_FILE)
+                            if mtime > last_targets_mtime:
+                                with open(TARGETS_FILE, "r") as f:
+                                    # Expected format: ["192.168.1.10", "192.168.1.15"]
+                                    active_targets = json.load(f)
+                                last_targets_mtime = mtime
+                        except Exception:
+                            pass
+
+                # If targets exist, filter. Otherwise let everything through 
+                # (Method 1 implies all traffic routing through this interface should be processed)
+                if active_targets:
+                    # check if the packet has src or dst in targets
+                    target_ips = [t['ip'] for t in active_targets] if isinstance(active_targets[0], dict) else active_targets
+                    if processed["src_ip"] not in target_ips and processed["dst_ip"] not in target_ips:
+                        continue # Drop packet because it doesn't belong to our specific targets
+
+                print(processed)
                 # Push to queue
                 try:
                     packet_queue.put_nowait(processed)

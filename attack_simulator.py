@@ -11,10 +11,10 @@ def sentinel_trigger(target_ip, target_port, duration=10):
 
     while time.time() - start < duration:
         send(
-            IP(src="127.0.0.1", dst=target_ip) /
+            IP(src="192.168.1.10", dst=target_ip) /
             TCP(sport=sport, dport=target_port, flags="S"),
             verbose=0,
-            iface="lo"
+            iface="wlo1"
         )
         time.sleep(0.0005)  # controlled flood
 

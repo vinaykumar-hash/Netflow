@@ -1,4 +1,10 @@
 import pandas as pd
+import uuid
+import os
+import requests
+import json
+import torch
+from sentence_transformers import SentenceTransformer, util
 import pathway as pw
 import datetime
 from typing import Any
@@ -16,6 +22,7 @@ from features.feature_small_packets import detect_small_packet_flow
 from features.feature_sequence import analyze_sequence
 from features.feature_encryption import get_encryption_label
 from features.feature_flow_stats import compute_flow_stats
+import uuid
 
 load_dotenv()
 
@@ -77,13 +84,36 @@ pw.io.csv.write(
 
 # Load Whitelist Configuration
 WHITELIST = {"ips": [], "ports": []}
-if os.path.exists("whitelist.json"):
+LAST_WHITELIST_MTIME = 0
+LAST_CHECK_TIME = 0
+WHITELIST_FILE = "whitelist.json"
+
+def _update_whitelist_if_needed():
+    global WHITELIST, LAST_WHITELIST_MTIME, LAST_CHECK_TIME
+    current_time = time.time()
+    # Throttling: only check file stat at most once per second
+    if current_time - LAST_CHECK_TIME > 1.0:
+        LAST_CHECK_TIME = current_time
+        if os.path.exists(WHITELIST_FILE):
+            try:
+                mtime = os.path.getmtime(WHITELIST_FILE)
+                if mtime > LAST_WHITELIST_MTIME:
+                    with open(WHITELIST_FILE, "r") as f:
+                        WHITELIST = json.load(f)
+                    LAST_WHITELIST_MTIME = mtime
+            except Exception:
+                pass
+
+if os.path.exists(WHITELIST_FILE):
     import json
-    with open("whitelist.json", "r") as f:
-        WHITELIST = json.load(f)
+    import time
+    _update_whitelist_if_needed()
 
 @pw.udf
 def is_whitelisted(src_ip: str | None, dst_ip: str | None, src_port: str | None, dst_port: str | None) -> bool:
+    # Always check if we need to reload whitelist
+    _update_whitelist_if_needed()
+    
     # 1. Whitelist Localhost and Link-Local (IPv6)
     # 1. Whitelist Link-Local (IPv6) - keep localhost separate
     if src_ip and (src_ip.startswith("fe80:") or src_ip.startswith("ff02:")):
@@ -464,12 +494,21 @@ flow_pulse = flow_analysis.windowby(
 
 
 # Filter for anomalies only (Shared logic)
+@pw.udf
+def is_above_threshold(score: float) -> bool:
+    _update_whitelist_if_needed()
+    try:
+        threshold = float(WHITELIST.get("anomaly_threshold", 0.0))
+    except (ValueError, TypeError):
+        threshold = 0.0
+    return score >= threshold
+
 # anomalous_pulse = flow_pulse.filter(
 #     pw.this.anomaly_score > 0.5
 # )
 # anomalous_pulse = flow_pulse.filter(~pw.this.whitelisted)
 anomalous_pulse = flow_pulse.filter(
-    (pw.this.anomaly_score >= 0.0) & (~pw.this.whitelisted)
+    is_above_threshold(pw.this.anomaly_score) & (~pw.this.whitelisted)
 )
 port_monitor = flows_internal.filter(
     pw.this.is_internal_target & (~pw.this.whitelisted)
@@ -563,15 +602,16 @@ pw.io.csv.write(
 # 6. Format for LLM Indexing (DocumentStore)
 # 6. Format for LLM Indexing (DocumentStore)
 @pw.udf
-def format_doc_udf(flow_id, score, confidence, packets, bytes_sent, duration) -> bytes:
+def format_doc_udf(flow_id, score, confidence, packets, bytes_sent, duration, reason) -> str:
     return (
         f"Flow: {flow_id} | "
+        f"Description: {reason} | "
         f"Score: {score:.2f} | "
         f"Confidence: {confidence:.2f} | "
         f"Packets: {packets} | "
         f"Bytes: {bytes_sent} | "
         f"Duration: {duration:.2f}s"
-    ).encode("utf-8")
+    )
 
 live_docs = anomalous_pulse.select(
     data=format_doc_udf(
@@ -581,18 +621,8 @@ live_docs = anomalous_pulse.select(
         pw.this.packet_count,
         pw.this.total_bytes,
         pw.this.duration,
-    ),
-    _metadata=pw.apply(
-        lambda _: {
-            "modified_at": 0,
-            "seen_at": 0,
-            "path": "live_stream"
-        },
-        pw.this.flow_id
+        pw.this.anomaly_reason,
     )
-).select(
-    pw.this.data,
-    pw.this._metadata
 )
 
 @pw.udf
@@ -605,39 +635,57 @@ def ensure_bytes(x) -> bytes:
 static_df = pd.DataFrame([
     {
         "data": b"Sentinel System initialized. Monitoring network traffic...",
-        "_metadata": {"modified_at": 0, "seen_at": 0, "path": "static_init"}
+        "path": "static_init"
     }
 ])
 
-@pw.udf
-def ensure_metadata(meta) -> dict:
-    MAX_I64 = 9223372036854775807
-    try:
-        ts = int(meta.get("modified_at", 0))
-    except:
-        ts = 0
-
-    ts = max(0, min(ts, MAX_I64))
-
-    return {
-        "modified_at": ts,
-        "seen_at": ts,
-        "path": str(meta.get("path", "static_init"))
-    }
-
 static_docs = pw.debug.table_from_pandas(static_df).select(
-    data=ensure_bytes(pw.this.data),
-    _metadata=ensure_metadata(pw.this._metadata)
+    data=ensure_bytes(pw.this.data)
 )
 
-# --- RAG / VECTOR STORE DISABLED FOR STABILITY ---
-# The DocumentStore is causing persistent panic (TryFromIntError).
-# We are temporarily bypassing it to allow the main Anomaly Detection system to run.
+# --- SIDE-CAR RAG LOGIC ---
+# We write anomalies to a CSV and read them in the LLM UDF to bypass Pathway engine panics.
+pw.io.csv.write(live_docs, filename="docs/rag_context.csv")
 
-# Indexing
-embedder = SentenceTransformerEmbedder(model="all-MiniLM-L6-v2")
-# retriever_factory = BruteForceKnnFactory(embedder=embedder)
-# document_store = DocumentStore(docs=analyzed_docs, retriever_factory=retriever_factory)
+# Semantic search logic using SentenceTransformers
+from sentence_transformers import SentenceTransformer, util
+import torch
+
+_embedder_model = None
+
+@pw.udf
+def semantic_search_udf(query: str, context_list: tuple) -> list:
+    global _embedder_model
+    if not context_list:
+        return []
+    
+    # We maintain only the last 50 chunks for performance and relevance
+    raw_list = list(context_list)
+    active_context = raw_list[-50:]
+    
+    if _embedder_model is None:
+        _embedder_model = SentenceTransformer("all-MiniLM-L6-v2")
+    
+    # Encode query and all chunks in the window
+    # decode bytes to string
+    str_chunks = []
+    for c in active_context:
+        if isinstance(c, bytes):
+            str_chunks.append(c.decode("utf-8", errors="ignore"))
+        else:
+            str_chunks.append(str(c))
+
+    query_emb = _embedder_model.encode(query, convert_to_tensor=True)
+    corpus_emb = _embedder_model.encode(str_chunks, convert_to_tensor=True)
+    
+    # Compute similarity and pick top 3
+    hits = util.semantic_search(query_emb, corpus_emb, top_k=3)[0]
+    
+    results = []
+    for hit in hits:
+        results.append({"text": str_chunks[hit["corpus_id"]]})
+    
+    return results
 
 # Webserver & Queries
 query_server = pw.io.http.PathwayWebserver(host="0.0.0.0", port=8011)
@@ -645,6 +693,8 @@ query_server = pw.io.http.PathwayWebserver(host="0.0.0.0", port=8011)
 
 class QuerySchema(pw.Schema):
     messages: str
+    model: str | None
+    selected_row: str | None
 
 queries, writer = pw.io.http.rest_connector(
     webserver=query_server,
@@ -654,34 +704,169 @@ queries, writer = pw.io.http.rest_connector(
 )
 
 # Process Queries
-queries_processed = queries.select(
+# We use a unique string ID to avoid u128 index panics in older Pathway versions
+queries_pre = queries.select(
     query = pw.this.messages,
+    model = pw.this.model,
+    selected_row = pw.this.selected_row,
+    k = 3,
+    request_id = pw.apply_with_type(lambda _: str(uuid.uuid4()), str, pw.this.messages),
+    dummy_key = pw.apply_with_type(lambda _: "global_context", str, pw.this.messages)
+)
+# No join needed! We use the global _SHARED_CONTEXT in the LLM UDF directly to bypass Pathway engine panics.
+retrieved_documents = queries_pre.select(
+    *pw.this,
+    result = pw.apply(lambda _: [], pw.this.query) # Compatibility mock
 )
 
-# BYPASS: Join with empty result instead of calling document_store.retrieve_query
-queries_context = queries_processed.select(
-    *pw.this,
-    result = pw.apply(lambda x: [], pw.this.query) 
-)
+import requests
+import json
 
 @pw.udf
 def build_prompts_udf(documents, query) -> str:
-    # Dummy prompt builder since RAG is disabled
-    return f"Analyze this network status based on general knowledge.\nUser Question: {query}\n(Note: Live context retrieval is temporarily disabled due to system instability.)"
+    if not documents:
+        return f"System: Network context is empty. \nUser: {query}"
+    
+    valid_docs = []
+    for doc in documents:
+        if doc is None: 
+            continue
+        try:
+            # Extract text or data
+            text = doc.get("text", "") if hasattr(doc, "get") else ""
+            if not text and hasattr(doc, "get"):
+                text = doc.get("data", "")
+                
+            if isinstance(text, bytes):
+                text = text.decode("utf-8", errors="ignore")
+            else:
+                text = str(text)
+                
+            if text and text.strip():
+                valid_docs.append(text)
+        except Exception:
+            pass
+            
+    if not valid_docs:
+        return f"System: Network context is empty. \nUser: {query}"
+        
+    context = " | ".join(valid_docs)
+    return f"System: Use this live network context to precisely answer the user: {context}\n\nUser: {query}"
 
-prompts = queries_context.select(
-     prompt_text=build_prompts_udf(pw.this.result, pw.this.query)
+prompts = retrieved_documents.select(
+    prompt_text=pw.this.query,
+    model=pw.this.model,
+    selected_row=pw.this.selected_row
 )
 
-model = LiteLLMChat(
-    model="openrouter/arcee-ai/trinity-large-preview:free",
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-    retry_strategy=pw.udfs.FixedDelayRetryStrategy(2,3)
-)
+@pw.udf
+def call_openrouter(query: str, model: str | None, selected_row: str | None) -> str:
+    global _embedder_model
+    
+    # --- RAG SIDE-CAR: READ FROM CSV ---
+    context_str = ""
+    try:
+        csv_path = "docs/rag_context.csv"
+        # Check if it's a directory (Pathway can write CSVs as directories of parts)
+        if os.path.exists(csv_path):
+            import csv
+            all_rows = []
+            if os.path.isdir(csv_path):
+                import glob
+                for part in glob.glob(os.path.join(csv_path, "*.csv")):
+                    with open(part, "r") as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            # Only include active records (diff=1) and skip retracted ones
+                            if row.get("diff") == "1" and "data" in row:
+                                all_rows.append(row["data"])
+            else:
+                with open(csv_path, "r") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get("diff") == "1" and "data" in row:
+                            all_rows.append(row["data"])
+            
+            # Get last 200 for broader context coverage
+            active_context: Any = all_rows[-200:]
+            
+            if active_context:
+                # 1. Keyword Boosting (IPs/Ports)
+                query_tokens = query.replace(":", " ").replace("-", " ").replace(".", " ").split()
+                keywords = [t for t in query_tokens if len(t) > 2] # Skip small tokens
+                
+                # Rows that exactly match a query token (IP, Port, etc.)
+                priority_docs = []
+                for doc in active_context:
+                    if any(kw.lower() in doc.lower() for kw in keywords):
+                        priority_docs.append(doc)
+                
+                # 2. Semantic Search
+                if _embedder_model is None:
+                    _embedder_model = SentenceTransformer("all-MiniLM-L6-v2")
+                
+                query_emb = _embedder_model.encode(query, convert_to_tensor=True)
+                corpus_emb = _embedder_model.encode(active_context, convert_to_tensor=True)
+                # Increase top_k to 10 for better coverage
+                hits = util.semantic_search(query_emb, corpus_emb, top_k=min(10, len(active_context)))[0]
+                semantic_docs = [str(active_context[hit["corpus_id"]]) for hit in hits]
+                
+                # 3. Combine: Keywords first, then Semantic
+                final_docs = []
+                seen = set()
+                # Prioritize keyword matches
+                for doc in priority_docs:
+                    if doc not in seen:
+                        final_docs.append(doc)
+                        seen.add(doc)
+                # Add semantic matches
+                for doc in semantic_docs:
+                    if doc not in seen:
+                        final_docs.append(doc)
+                        seen.add(doc)
+                
+                # Limit final context to 15 chunks (balanced)
+                context_str = " | ".join(final_docs[:15])
+    except Exception as e:
+        context_str = f"RAG Side-car Error: {str(e)}"
+
+    selected_context = selected_row if selected_row else ""
+    system_prompt = f"System: Network Context: {context_str}\n{selected_context}\n\nUse this context to answer precisely. If empty, answer generally."
+    user_query = f"User: {query}"
+    full_prompt = f"{system_prompt}\n\n{user_query}"
+    
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return "Error: OPENROUTER_API_KEY is not set."
+    
+    target_model = str(model) if model else "arcee-ai/trinity-large-preview:free"
+    if target_model.startswith("openrouter/"):
+        target_model = target_model.replace("openrouter/", "", 1)
+        
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": target_model,
+                "messages": [{"role": "user", "content": full_prompt}],
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        if e.response is not None:
+            return f"LLM Error ({target_model}): {str(e)} - {e.response.text}"
+        return f"LLM Error ({target_model}): {str(e)}"
+    except Exception as e:
+        return f"LLM Error ({target_model}): {str(e)}"
 
 responses = prompts.select(
-    result = pw.apply(lambda r: str(r), model(llms.prompt_chat_single_qa(pw.this.prompt_text)))
+    result = call_openrouter(pw.this.prompt_text, pw.this.model, pw.this.selected_row)
 )
 
 writer(responses)

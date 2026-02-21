@@ -18,6 +18,8 @@ def start():
     subprocess.run("pkill -f live_capture.py", shell=True, stderr=subprocess.DEVNULL)
     # Kill orphaned tshark
     subprocess.run("pkill -f tshark", shell=True, stderr=subprocess.DEVNULL)
+    # Kill orphaned arpspoof
+    subprocess.run("sudo pkill -f arpspoof", shell=True, stderr=subprocess.DEVNULL)
     
     # Reset live data to avoid processing old packets
     live_data = f"{root}/docs/live_packets.json"
@@ -55,8 +57,12 @@ def start():
     # 4. Start Pathway Engine
     print("Launching Pathway Engine (Port 8011)...")
     time.sleep(5) # Give Django time to bind
-    # Force offline mode to use cached models
-    engine_env = {**os.environ, "RUST_BACKTRACE": "1", "HF_HUB_OFFLINE": "1"}
+    # Use the original user's huggingface cache to avoid re-downloading
+    engine_env = {
+        **os.environ, 
+        "RUST_BACKTRACE": "1",
+        "HF_HOME": "/home/vinay/.cache/huggingface"
+    }
     pathway_proc = subprocess.Popen(
         [venv_python, f"{root}/main.py"],
         stdout=open(f"{root}/pathway.log", "w"),
