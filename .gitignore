@@ -8,6 +8,45 @@ wheels/
 
 # Virtual environments
 .venv
-.env*
+
+# Environment variables (never commit secrets)
+.env
+.env.*
+
+# Log files
 *.log
+logs/
+capture.log
+django.log
+pathway.log
+vite.log
+monitor.log
+sentinel.log
+
+# Network capture files
 *.pcap
+*.pcapng
+
+# Frontend
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/.vite/
+
+# Live data / streaming artefacts
+live_data/stream.jsonl
+docs/rag_context.csv
+docs/anomalies.csv
+docs/debug_*.csv
+logs/all_packets.csv
+logs/debug_*.csv
+res.csv
+res_full_stream.csv
+
+# Test / scratch files
+test_input.csv
+test_output.csv
+test_*.log
+*.bak
+
+# Misc
+active_targets.json
