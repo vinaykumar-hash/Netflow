@@ -60,7 +60,7 @@ const ChartContainer = React.memo(({ title, children, className }) => (
 ));
 
 const SecurityTable = React.memo(({ flows, formatTime, selectedRows = [], onRowSelect }) => (
-  <BentoCard title="Real-time Security Table" icon={<Terminal className="w-5 h-5 text-indigo-400" />} className="flex-1 overflow-hidden h-full">
+  <BentoCard title="RTS Table" icon={<Terminal className="w-5 h-5 text-indigo-400" />} className="flex-1 overflow-hidden h-full">
     <div className="overflow-x-auto h-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent will-change-transform translate-z-0 overflow-y-auto">
       <table className="w-full text-left border-collapse table-fixed">
         <thead className="text-xs uppercase text-secondary bg-[#0B0F19] sticky top-0 backdrop-blur-sm z-20">
@@ -124,7 +124,7 @@ const App = () => {
   });
   const [systemStats, setSystemStats] = useState({ cpu: 0, ram: 0 }); // System Stats state
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', text: 'Hello! I am your Network Security Assistant. How can I help you analyze the traffic today?' }
+    { role: 'assistant', text: 'Select any flow or ask any question about the network traffic.' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -149,7 +149,8 @@ const App = () => {
   }, [isMonitoring]);
   const [selectedModel, setSelectedModel] = useState("arcee-ai/trinity-large-preview:free");
   const [showSettings, setShowSettings] = useState(false);
-  const [whitelist, setWhitelist] = useState({ ips: [], ports: [], anomaly_threshold: 0 });
+  const [whitelist, setWhitelist] = useState({ ips: [], ports: [], anomaly_threshold: 0, logging: { all_packets: true, anomalies: true, rag_context: true, graph_edges: true } });
+  const [portsText, setPortsText] = useState(''); // raw string for the ports input
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [isSpoofingLoading, setIsSpoofingLoading] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
@@ -183,7 +184,11 @@ const App = () => {
   const fetchWhitelist = async () => {
     try {
       const res = await axios.get('http://localhost:8000/api/settings/whitelist/');
-      setWhitelist(res.data);
+      const data = res.data;
+      // Ensure logging defaults if missing
+      if (!data.logging) data.logging = { all_packets: true, anomalies: true, rag_context: true, graph_edges: true };
+      setWhitelist(data);
+      setPortsText((data.ports || []).join(', '));
     } catch (e) { console.error(e); }
   };
 
@@ -284,12 +289,19 @@ const App = () => {
           return [...prev, newData].slice(-30); // Keep last 30 for chart
         });
 
-        // Latest Info (Chat Context for anomalies)
-        if (latestFlow.anomaly_score > 0.5) { // Threshold for anomaly alert
-          setChatMessages(prev => [...prev, { // Changed setMessages to setChatMessages
-            role: 'assistant',
-            text: `🚨 Anomaly Detected! Score: ${latestFlow.anomaly_score.toFixed(2)} | src: ${latestFlow.src_ip}`,
-          }]);
+        // Auto-alert: only fire when threshold > 0 and score meets it
+        const alertThreshold = whitelist.anomaly_threshold;
+        if (alertThreshold > 0 && latestFlow.anomaly_score >= alertThreshold) {
+          const alertKey = `${latestFlow.flow}-${latestFlow.anomaly_score?.toFixed(2)}`;
+          setChatMessages(prev => {
+            // Avoid duplicate alerts for the same flow+score
+            if (prev.some(m => m._key === alertKey)) return prev;
+            return [...prev, {
+              role: 'assistant',
+              _key: alertKey,
+              text: `🚨 Anomaly Detected! Score: ${latestFlow.anomaly_score.toFixed(2)} | ${latestFlow.flow || 'Unknown flow'}`,
+            }];
+          });
         }
       } else {
         // If no flow updates, still update chart history with zero packets
@@ -623,13 +635,71 @@ Encryption: ${r.encryption}
 
               <div className="bg-white/5 p-4 border border-white/10">
                 <h3 className="font-bold mb-4">Whitelist Configuration</h3>
-                <label className="block text-sm text-secondary mb-1">Whitelisted Ports (comma separated)</label>
-                <input type="text" value={whitelist.ports.join(', ')} onChange={(e) => setWhitelist({ ...whitelist, ports: e.target.value.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) })} className="w-full bg-black/40 border border-white/10 p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 mb-4 font-mono" />
+                <label className="block text-sm text-secondary mb-1">Whitelisted Ports (comma or space separated)</label>
+                <input
+                  type="text"
+                  value={portsText}
+                  onChange={(e) => setPortsText(e.target.value)}
+                  onBlur={(e) => {
+                    const parsed = e.target.value.split(/[,\s]+/).map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+                    setWhitelist(prev => ({ ...prev, ports: parsed }));
+                  }}
+                  placeholder="e.g. 8000, 8011 443"
+                  className="w-full bg-black/40 border border-white/10 p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 mb-4 font-mono"
+                />
 
                 <label className="block text-sm text-secondary mb-1">Anomaly Score Threshold</label>
                 <input type="number" step="0.1" min="0" max="1" value={whitelist.anomaly_threshold} onChange={(e) => setWhitelist({ ...whitelist, anomaly_threshold: parseFloat(e.target.value) || 0 })} className="w-full bg-black/40 border border-white/10 p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 mb-4 font-mono" />
 
-                <button onClick={() => saveWhitelist(whitelist)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors">Save Whitelist</button>
+                <button
+                  onClick={() => {
+                    const parsed = portsText.split(/[,\s]+/).map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+                    const updated = { ...whitelist, ports: parsed };
+                    setWhitelist(updated);
+                    saveWhitelist(updated);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors"
+                >Save Whitelist</button>
+              </div>
+
+              {/* Logging Toggles */}
+              <div className="bg-white/5 p-4 border border-white/10">
+                <h3 className="font-bold mb-1">Log Files</h3>
+                <p className="text-xs text-slate-500 mb-4">Disable logs to reduce disk I/O. Changes take effect within ~1 second.</p>
+                <div className="space-y-3">
+                  {[
+                    { key: 'all_packets', label: 'All Packets', path: 'logs/all_packets.csv', desc: 'Every raw captured packet' },
+                    { key: 'anomalies', label: 'Anomaly Events', path: 'docs/anomalies.csv', desc: 'Flows that exceed the anomaly threshold' },
+                    { key: 'rag_context', label: 'RAG Context', path: 'docs/rag_context.csv', desc: 'Context fed to the AI assistant' },
+                    { key: 'graph_edges', label: 'Graph Edges', path: 'logs/debug_graph_edges.csv', desc: 'Network topology edges' },
+                  ].map(({ key, label, path, desc }) => {
+                    const enabled = whitelist.logging?.[key] ?? true;
+                    return (
+                      <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-white/[0.06] last:border-0">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-200">{label}</p>
+                          <p className="text-[11px] text-slate-500 font-mono">{path}</p>
+                          <p className="text-[11px] text-slate-500">{desc}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updated = {
+                              ...whitelist,
+                              logging: { ...(whitelist.logging || {}), [key]: !enabled }
+                            };
+                            setWhitelist(updated);
+                            saveWhitelist(updated);
+                          }}
+                          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-indigo-500' : 'bg-white/10'
+                            }`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -839,7 +909,7 @@ Encryption: ${r.encryption}
         {/* Right Column: AI Assistant */}
         <div className="col-span-4 h-[calc(100vh-64px)] bg-[#0B0F19] overflow-hidden sticky top-16 flex flex-col">
           <BentoCard
-            title="Security Analyst AI"
+            title="Flow AI"
             icon={<Bot className="w-5 h-5 text-emerald-400" />}
             className="flex-1 overflow-hidden border-none"
             bodyClassName="flex flex-col"

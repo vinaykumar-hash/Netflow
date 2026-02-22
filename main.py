@@ -69,7 +69,11 @@ packets = pw.io.jsonlines.read(
 
 # pw.io.csv.write(packets, filename="docs/raw_packets.csv")
 
-# Log all raw traffic for debugging
+# Log all raw traffic — gated by logging.all_packets flag
+@pw.udf
+def _gate_all_packets(_unused: float) -> bool:
+    return _is_logging_enabled("all_packets")
+
 pw.io.csv.write(
     packets.select(
         pw.this.timestamp,
@@ -78,7 +82,7 @@ pw.io.csv.write(
         pw.this.src_port,
         pw.this.dst_port,
         pw.this.protocols
-    ),
+    ).filter(_gate_all_packets(pw.this.timestamp)),
     filename="logs/all_packets.csv"
 )
 
@@ -108,6 +112,11 @@ if os.path.exists(WHITELIST_FILE):
     import json
     import time
     _update_whitelist_if_needed()
+
+def _is_logging_enabled(key: str) -> bool:
+    """Check whitelist logging flags. Defaults to True if key not present."""
+    _update_whitelist_if_needed()
+    return bool(WHITELIST.get("logging", {}).get(key, True))
 
 @pw.udf
 def is_whitelisted(src_ip: str | None, dst_ip: str | None, src_port: str | None, dst_port: str | None) -> bool:
@@ -562,8 +571,13 @@ graph_edges = flows_with_whitelist.filter(
     pw.this.weight > 0 # Filter noise (low packet counts)
 )
 
+# Graph edge log — gated by logging.graph_edges flag
+@pw.udf
+def _gate_graph_edges(_unused: float) -> bool:
+    return _is_logging_enabled("graph_edges")
+
 pw.io.csv.write(
-    graph_edges,
+    graph_edges.filter(_gate_graph_edges(pw.this.weight)),
     filename="logs/debug_graph_edges.csv"
 )
 
@@ -594,8 +608,13 @@ pw.io.http.write(
 # Debug: Write to CSV for manual check
 # pw.io.csv.write(flow_pulse, filename="docs/debug_flows.csv")
 
+# Anomaly log — gated by logging.anomalies flag
+@pw.udf
+def _gate_anomalies(score: float) -> bool:
+    return _is_logging_enabled("anomalies")
+
 pw.io.csv.write(
-    anomalous_pulse,
+    anomalous_pulse.filter(_gate_anomalies(pw.this.anomaly_score)),
     filename="docs/anomalies.csv"
 )
 
@@ -645,7 +664,15 @@ static_docs = pw.debug.table_from_pandas(static_df).select(
 
 # --- SIDE-CAR RAG LOGIC ---
 # We write anomalies to a CSV and read them in the LLM UDF to bypass Pathway engine panics.
-pw.io.csv.write(live_docs, filename="docs/rag_context.csv")
+# RAG context log — gated by logging.rag_context flag
+@pw.udf
+def _gate_rag(_unused: bytes) -> bool:
+    return _is_logging_enabled("rag_context")
+
+pw.io.csv.write(
+    live_docs.filter(_gate_rag(pw.this.data)),
+    filename="docs/rag_context.csv"
+)
 
 # Semantic search logic using SentenceTransformers
 from sentence_transformers import SentenceTransformer, util

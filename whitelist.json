@@ -1,1 +1,11 @@
-{"ips": [], "ports": [8000, 8011, 5173, 9229], "anomaly_threshold": 0.5}
+{
+    "ips": [],
+    "ports": [],
+    "anomaly_threshold": 0,
+    "logging": {
+        "all_packets": true,
+        "anomalies": true,
+        "rag_context": true,
+        "graph_edges": true
+    }
+}
