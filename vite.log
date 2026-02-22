@@ -3,11 +3,8 @@
 > vite --host 0.0.0.0
 
 
-  VITE v5.4.21  ready in 178 ms
+  VITE v5.4.21  ready in 185 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.1.12:5173/
   ➜  press h + enter to show help
-4:23:56 pm [vite] hmr update /src/App.jsx, /src/index.css
-4:24:07 pm [vite] hmr update /src/App.jsx, /src/index.css
-4:24:57 pm [vite] hmr update /src/App.jsx, /src/index.css

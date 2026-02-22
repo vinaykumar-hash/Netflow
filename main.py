@@ -48,26 +48,13 @@ class PacketSchema(pw.Schema):
     ttl_hop_limit: str | None
     fragmentation: str | None
 
-# 1. Read Raw Packets
-# webserver = pw.io.http.PathwayWebserver(host="0.0.0.0", port=9000)
-# packets, _ = pw.io.http.rest_connector(
-#     webserver=webserver,
-#     schema=PacketSchema,
-#     autocommit_duration_ms=50
-# )
+
 packets = pw.io.jsonlines.read(
     "live_data/stream.jsonl",
     schema=PacketSchema,
     mode="streaming"
 )
-# Drop localhost and self-IP traffic early
-# packets = packets.filter(
-#     (pw.this.src_port == pw.this.dst_port)
-#     (pw.this.src_ip != "127.0.0.1") &
-#     (pw.this.dst_ip != "127.0.0.1")
-# )
 
-# pw.io.csv.write(packets, filename="docs/raw_packets.csv")
 
 # Log all raw traffic — gated by logging.all_packets flag
 @pw.udf
@@ -114,7 +101,6 @@ if os.path.exists(WHITELIST_FILE):
     _update_whitelist_if_needed()
 
 def _is_logging_enabled(key: str) -> bool:
-    """Check whitelist logging flags. Defaults to True if key not present."""
     _update_whitelist_if_needed()
     return bool(WHITELIST.get("logging", {}).get(key, True))
 
@@ -241,7 +227,7 @@ packets = packets.select(
     # is_encrypted="Unknown"
     is_encrypted = pw.apply(get_encryption_label, pw.this.protocols, pw.this.dst_port)
 )
-# pw.io.csv.write(packets, filename="docs/raw_packets.csv")
+
 
 
 # 2. Canonical Flow Key (Bidirectional)
@@ -278,7 +264,6 @@ packets_with_key = packets.select(
 )
 
 
-# 3. Window aggregation with Advanced Stats
 # 3. Window aggregation with Advanced Stats
 flow_stats = packets_with_key.groupby(pw.this.flow_key).windowby(
     pw.this.timestamp,
@@ -459,24 +444,6 @@ flow_analysis = flows_with_whitelist.select(
 debug_8080 = flow_analysis.filter(
     pw.this.dst_port == "8080"
 )
-# pw.io.csv.write(
-#     debug_8080.select(
-#         pw.this.flow_id,
-#         pw.this.packet_count,
-#         pw.this.total_bytes,
-#         pw.this.mean_size,
-#         pw.this.duration,
-#         pw.this.raw_score,
-#         pw.this.anomaly_score,
-#         pw.this.anomaly_reason,
-#         pw.this.confidence,
-#         pw.this.event_time
-#     ),
-#     filename="docs/debug_8080.csv"
-# )
-
-
-
 
 # 5. Push to Web Dashboard (Rate-Limited Pulse)
 # We window the analysis to send updates every 2s for UI stability
@@ -605,8 +572,6 @@ pw.io.http.write(
     headers={"Content-Type": "application/json"}
 )
 
-# Debug: Write to CSV for manual check
-# pw.io.csv.write(flow_pulse, filename="docs/debug_flows.csv")
 
 # Anomaly log — gated by logging.anomalies flag
 @pw.udf
@@ -618,7 +583,6 @@ pw.io.csv.write(
     filename="docs/anomalies.csv"
 )
 
-# 6. Format for LLM Indexing (DocumentStore)
 # 6. Format for LLM Indexing (DocumentStore)
 @pw.udf
 def format_doc_udf(flow_id, score, confidence, packets, bytes_sent, duration, reason) -> str:
@@ -674,7 +638,6 @@ pw.io.csv.write(
     filename="docs/rag_context.csv"
 )
 
-# Semantic search logic using SentenceTransformers
 from sentence_transformers import SentenceTransformer, util
 import torch
 
@@ -693,8 +656,6 @@ def semantic_search_udf(query: str, context_list: tuple) -> list:
     if _embedder_model is None:
         _embedder_model = SentenceTransformer("all-MiniLM-L6-v2")
     
-    # Encode query and all chunks in the window
-    # decode bytes to string
     str_chunks = []
     for c in active_context:
         if isinstance(c, bytes):
@@ -705,7 +666,7 @@ def semantic_search_udf(query: str, context_list: tuple) -> list:
     query_emb = _embedder_model.encode(query, convert_to_tensor=True)
     corpus_emb = _embedder_model.encode(str_chunks, convert_to_tensor=True)
     
-    # Compute similarity and pick top 3
+    # Compute similarity
     hits = util.semantic_search(query_emb, corpus_emb, top_k=3)[0]
     
     results = []
@@ -740,10 +701,9 @@ queries_pre = queries.select(
     request_id = pw.apply_with_type(lambda _: str(uuid.uuid4()), str, pw.this.messages),
     dummy_key = pw.apply_with_type(lambda _: "global_context", str, pw.this.messages)
 )
-# No join needed! We use the global _SHARED_CONTEXT in the LLM UDF directly to bypass Pathway engine panics.
 retrieved_documents = queries_pre.select(
     *pw.this,
-    result = pw.apply(lambda _: [], pw.this.query) # Compatibility mock
+    result = pw.apply(lambda _: [], pw.this.query)
 )
 
 import requests
@@ -818,7 +778,7 @@ def call_openrouter(query: str, model: str | None, selected_row: str | None) -> 
             active_context: Any = all_rows[-200:]
             
             if active_context:
-                # 1. Keyword Boosting (IPs/Ports)
+                # Keyword Boosting (IPs/Ports)
                 query_tokens = query.replace(":", " ").replace("-", " ").replace(".", " ").split()
                 keywords = [t for t in query_tokens if len(t) > 2] # Skip small tokens
                 
@@ -828,7 +788,7 @@ def call_openrouter(query: str, model: str | None, selected_row: str | None) -> 
                     if any(kw.lower() in doc.lower() for kw in keywords):
                         priority_docs.append(doc)
                 
-                # 2. Semantic Search
+                # Semantic Search
                 if _embedder_model is None:
                     _embedder_model = SentenceTransformer("all-MiniLM-L6-v2")
                 
@@ -838,7 +798,7 @@ def call_openrouter(query: str, model: str | None, selected_row: str | None) -> 
                 hits = util.semantic_search(query_emb, corpus_emb, top_k=min(10, len(active_context)))[0]
                 semantic_docs = [str(active_context[hit["corpus_id"]]) for hit in hits]
                 
-                # 3. Combine: Keywords first, then Semantic
+                # Combine: Keywords first, then Semantic
                 final_docs = []
                 seen = set()
                 # Prioritize keyword matches

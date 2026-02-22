@@ -35,13 +35,12 @@ def compute_flow_stats(
     packet_sizes: list[int],
     src_ips: list[str],
     dst_ips: list[str],
-    payloads: list[str], # Hex strings or raw bytes
+    payloads: list[str],
     tcp_seqs: list[str],
     src_ports: list[str],
     dst_ports: list[str]
 ) -> dict:
     
-    # 1. Identify Flow Direction (Canonical Key assumed handled by groupby caller, but we verify per packet)
     # We arbitrary define the "Forward" direction as the direction of the first packet seen in this window
     if not timestamps:
         return {}
@@ -79,8 +78,6 @@ def compute_flow_stats(
             flow.bwd_packets += 1
             flow.bwd_bytes += size
             
-        # Retransmission Check (Simple SEQ tracking)
-        # Note: seq is string in schema, cast to int
         try:
             seq_num = int(seq) if seq else 0
             if seq_num in flow.seq_seen and seq_num != 0:
@@ -103,16 +100,12 @@ def compute_flow_stats(
 
     # --- 3. Compute Metrics ---
     
-    # A) Duration
     duration = max(0.000001, flow.end_time - flow.start_time)
     
-    # B) Bytes
     total_bytes = flow.fwd_bytes + flow.bwd_bytes
     
-    # C) Packet Count
     total_packets = flow.fwd_packets + flow.bwd_packets
     
-    # D) Inter-Arrival Time (IAT)
     if len(flow.timestamps) > 1:
         iat = np.diff(flow.timestamps)
         mean_iat = float(np.mean(iat))
@@ -121,16 +114,12 @@ def compute_flow_stats(
         mean_iat = 0.0
         std_iat = 0.0
         
-    # E) Directionality Ratio
     direction_ratio = flow.fwd_bytes / (flow.bwd_bytes + 1e-6)
     
-    # F) Retransmission Rate
     retrans_rate = flow.retransmissions / max(1, total_packets)
     
-    # H) Burstiness
     burstiness = (std_iat / mean_iat) if mean_iat > 0 else 0.0
     
-    # I) Mean Idle (Gap > 2s)
     if len(flow.timestamps) > 1:
         iat = np.diff(flow.timestamps)
         idle_times = iat[iat > 2.0]
@@ -138,8 +127,6 @@ def compute_flow_stats(
     else:
         mean_idle = 0.0
 
-    # 4. Statistical Features
-    # A) Size Stats
     if flow.packet_sizes:
         mean_size = float(np.mean(flow.packet_sizes))
         std_size = float(np.std(flow.packet_sizes))
@@ -156,7 +143,7 @@ def compute_flow_stats(
         std_size = 0.0
         skew_size = 0.0
         
-    # B) Payload Entropy
+    #  Payload Entropy
     if flow.payloads:
         # Average entropy of packets
         entropy_vals = [entropy(p) for p in flow.payloads]
@@ -164,7 +151,7 @@ def compute_flow_stats(
     else:
         payload_entropy = 0.0
         
-    # D) Symmetry
+    #  Symmetry
     symmetry = 1.0 - (abs(flow.fwd_bytes - flow.bwd_bytes) / max(1, total_bytes))
     
     return {

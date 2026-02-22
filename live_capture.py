@@ -57,7 +57,6 @@ def file_writer_worker():
     # Ensure directory exists
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     
-    # Open file in append mode. 
     # Buffering=1 means line buffered, ensuring data hits disk reasonably fast but not too slow.
     with open(OUTPUT_FILE, "a", buffering=1) as f:
         while True:
@@ -67,12 +66,9 @@ def file_writer_worker():
                 if packet is None: 
                     break
                 
-                # Write immediately (buffering handles the I/O optimization)
+                # Write immediately
                 f.write(json.dumps(packet) + "\n")
                 packet_queue.task_done()
-                
-                # Optional: Drain queue if many items are waiting to do bulk write?
-                # For now, line buffering is safe and fast enough for ~50k/sec locally.
                 
             except Exception as e:
                 print(f"Writer error: {e}", file=sys.stderr)
@@ -92,9 +88,21 @@ def main():
     if os.path.exists(OUTPUT_FILE):
         os.rename(OUTPUT_FILE, f"{OUTPUT_FILE}.bak")
     
+    # Read capture interface from whitelist.json (falls back to wlo1)
+    WHITELIST_FILE = "whitelist.json"
+    capture_interface = "wlo1"
+    try:
+        if os.path.exists(WHITELIST_FILE):
+            with open(WHITELIST_FILE, "r") as f:
+                wl = json.load(f)
+                capture_interface = wl.get("capture_interface", "wlo1") or "wlo1"
+    except Exception:
+        pass
+    print(f"Capture interface: {capture_interface}")
+    
     cmd = [
         "tshark", 
-        "-i", "wlo1", 
+        "-i", capture_interface, 
         "-l", 
         "-T", "fields"
     ]
@@ -187,14 +195,13 @@ def main():
                     # check if the packet has src or dst in targets
                     target_ips = [t['ip'] for t in active_targets] if isinstance(active_targets[0], dict) else active_targets
                     if processed["src_ip"] not in target_ips and processed["dst_ip"] not in target_ips:
-                        continue # Drop packet because it doesn't belong to our specific targets
+                        continue 
 
                 print(processed)
-                # Push to queue
                 try:
                     packet_queue.put_nowait(processed)
                 except queue.Full:
-                    # print("Queue full!", file=sys.stderr)
+                    # print("Queue full!", file=sys.stderr)``
                     pass
 
             except Exception:

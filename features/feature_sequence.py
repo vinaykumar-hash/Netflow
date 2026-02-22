@@ -10,16 +10,12 @@ def analyze_sequence(sequence_list, timestamp_list) -> str | None:
         for seq, ts in zip(sequence_list, timestamp_list):
             if seq is not None and ts is not None:
                 s_str = str(seq).strip()
-                # timestamp is already float from schema
                 if s_str:
                      packets.append((ts, float(s_str)))
         
-        # Sort by timestamp (index 0)
         packets.sort(key=lambda x: x[0])
         
-        # Check sequence order
         for i in range(1, len(packets)):
-             # packets[i][1] is the sequence number
              if packets[i][1] < packets[i-1][1]:
                  out_of_order_count += 1
                  

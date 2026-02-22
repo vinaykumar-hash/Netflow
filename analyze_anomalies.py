@@ -37,7 +37,7 @@ def analyze_sequence(sequence_list) -> str | None:
     except (ValueError, TypeError):
         return None
                 
-    if out_of_order_count > 50: # Updated threshold
+    if out_of_order_count > 50:
         return f"Out-of-order packets detected: {out_of_order_count}"
     return None
 
@@ -46,7 +46,7 @@ def detect_small_packet_flow(packet_lengths, threshold=0.9, min_packets=100) -> 
         return None
         
     try:
-        # Updated logic: ignore 0-byte payloads
+        # ignore 0-byte payloads
         small_packets = [l for l in packet_lengths if l is not None and 0 < float(l) < 100]
         ratio = len(small_packets) / len(packet_lengths)
         
@@ -168,7 +168,6 @@ def main():
             print(f"  Anomalies: {', '.join(reasons)}")
             print(f"  Packets: {len(flow['ttl_list'])}")
             
-            # Debug info
             numeric_ttls = [float(t) for t in flow["ttl_list"] if t is not None and str(t).strip()]
             if numeric_ttls:
                 print(f"  TTL StdDev: {np.std(numeric_ttls):.2f}")
@@ -178,7 +177,6 @@ def main():
                  try: numeric_seq.append(float(t))
                  except: pass
             
-            # Recalc small packet ratio
             p_lens = flow["payload_len_list"]
             s_pkts = [l for l in p_lens if l is not None and 0 < float(l) < 100]
             if len(p_lens) > 0:

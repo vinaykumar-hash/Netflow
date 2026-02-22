@@ -1,6 +1,5 @@
 def analyze_ttl(ttl_list, threshold=5.0) -> str | None:
     import numpy as np
-    # Filter out None and ensure they are floats
     try:
         numeric_ttls = [float(t) for t in ttl_list if t is not None and str(t).strip()]
     except (ValueError, TypeError):

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
-import NetworkGraph from './components/NetworkGraph'; // Import component
+import NetworkGraph from './components/NetworkGraph';
 
 const isAnomalous = (flow) => {
   return (flow.flag_anomalies && flow.flag_anomalies.length > 0) ||
@@ -20,7 +20,6 @@ const isAnomalous = (flow) => {
     flow.small_packet_anomaly;
 };
 
-// --- Components ---
 
 const BentoCard = React.memo(({ children, className = "", bodyClassName = "", title, icon, actions }) => (
   <div className={`bg-gray-900/40 backdrop-blur-xl border-r border-b border-white/10 flex flex-col hover:bg-white/[0.02] transition-colors duration-300 group ${className}`}>
@@ -122,7 +121,7 @@ const App = () => {
     anomalies: 0,
     encryptedRatio: 0
   });
-  const [systemStats, setSystemStats] = useState({ cpu: 0, ram: 0 }); // System Stats state
+  const [systemStats, setSystemStats] = useState({ cpu: 0, ram: 0 });
   const [chatMessages, setChatMessages] = useState([
     { role: 'assistant', text: 'Select any flow or ask any question about the network traffic.' }
   ]);
@@ -131,13 +130,12 @@ const App = () => {
   const chatEndRef = useRef(null);
 
   const [chartHistory, setChartHistory] = useState(new Array(30).fill({ packet_count: 0 }));
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] }); // Graph state
-  const [portAlerts, setPortAlerts] = useState([]); // Port Activity state
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'graph'
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [portAlerts, setPortAlerts] = useState([]);
+  const [viewMode, setViewMode] = useState('list');
   const messageQueue = useRef([]);
-  const lastGraphUpdate = useRef(0); // Throttle graph updates
+  const lastGraphUpdate = useRef(0);
 
-  // New state variables for Setup and Settings
   const [setupStep, setSetupStep] = useState(1);
   const [monitoringMethod, setMonitoringMethod] = useState(1);
   const [devices, setDevices] = useState([]);
@@ -149,11 +147,12 @@ const App = () => {
   }, [isMonitoring]);
   const [selectedModel, setSelectedModel] = useState("arcee-ai/trinity-large-preview:free");
   const [showSettings, setShowSettings] = useState(false);
-  const [whitelist, setWhitelist] = useState({ ips: [], ports: [], anomaly_threshold: 0, logging: { all_packets: true, anomalies: true, rag_context: true, graph_edges: true } });
-  const [portsText, setPortsText] = useState(''); // raw string for the ports input
+  const [whitelist, setWhitelist] = useState({ ips: [], ports: [], anomaly_threshold: 0, capture_interface: 'wlo1', logging: { all_packets: true, anomalies: true, rag_context: true, graph_edges: true } });
+  const [portsText, setPortsText] = useState('');
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [isSpoofingLoading, setIsSpoofingLoading] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
+  const [interfaces, setInterfaces] = useState([]);
 
   const fetchDevices = async () => {
     setIsLoadingDevices(true);
@@ -163,6 +162,18 @@ const App = () => {
     } catch (e) { console.error(e); }
     setIsLoadingDevices(false);
   };
+
+  const fetchInterfaces = async () => {
+    try {
+      const res = await axios.get('http://localhost:8000/api/network/interfaces/');
+      setInterfaces(Array.isArray(res.data) ? res.data : []);
+    } catch (e) { console.error(e); }
+  };
+
+  // Fetch interfaces when settings modal opens
+  useEffect(() => {
+    if (showSettings) fetchInterfaces();
+  }, [showSettings]);
 
   const startSpoofing = async (targets) => {
     setIsSpoofingLoading(true);
@@ -185,7 +196,6 @@ const App = () => {
     try {
       const res = await axios.get('http://localhost:8000/api/settings/whitelist/');
       const data = res.data;
-      // Ensure logging defaults if missing
       if (!data.logging) data.logging = { all_packets: true, anomalies: true, rag_context: true, graph_edges: true };
       setWhitelist(data);
       setPortsText((data.ports || []).join(', '));
@@ -232,15 +242,13 @@ const App = () => {
         time: formatTime(representativeData.last_packet_time)
       }].slice(-30));
 
-      // Separate Updates
       const flowUpdates = latestBatch.filter(d => d.type !== 'graph_edge' && d.type !== 'port_alert' && d.type !== 'system_stats');
       const graphUpdates = latestBatch.filter(d => d.type === 'graph_edge');
       const alertUpdates = latestBatch.filter(d => d.type === 'port_alert');
       const sysUpdates = latestBatch.filter(d => d.type === 'system_stats');
 
-      // Update System Stats
       if (sysUpdates.length > 0) {
-        const latest = sysUpdates[sysUpdates.length - 1]; // Take most recent
+        const latest = sysUpdates[sysUpdates.length - 1];
         setSystemStats({
           cpu: latest.cpu,
           ram: latest.ram
@@ -283,18 +291,16 @@ const App = () => {
           const newData = {
             packet_count: latestFlow.packet_count || 0,
             time: formatTime(latestFlow.last_packet_time),
-            bytes: latestFlow.bytes || 0, // Assuming 'bytes' field exists in flow data
-            anomaly: latestFlow.anomaly_score || 0 // Assuming 'anomaly_score' field exists
+            bytes: latestFlow.bytes || 0,
+            anomaly: latestFlow.anomaly_score || 0
           };
-          return [...prev, newData].slice(-30); // Keep last 30 for chart
+          return [...prev, newData].slice(-30);
         });
 
-        // Auto-alert: only fire when threshold > 0 and score meets it
         const alertThreshold = whitelist.anomaly_threshold;
         if (alertThreshold > 0 && latestFlow.anomaly_score >= alertThreshold) {
           const alertKey = `${latestFlow.flow}-${latestFlow.anomaly_score?.toFixed(2)}`;
           setChatMessages(prev => {
-            // Avoid duplicate alerts for the same flow+score
             if (prev.some(m => m._key === alertKey)) return prev;
             return [...prev, {
               role: 'assistant',
@@ -304,28 +310,19 @@ const App = () => {
           });
         }
       } else {
-        // If no flow updates, still update chart history with zero packets
         setChartHistory(prev => [...prev, { packet_count: 0, time: formatTime(Date.now() / 1000) }].slice(-30));
       }
 
-
-      // 2. Port Alerts
       if (alertUpdates.length > 0) {
         setPortAlerts(prev => {
-          // Aggregate by port
           const portMap = new Map(prev.map(p => [p.port, p]));
 
           alertUpdates.forEach(update => {
             portMap.set(update.port, update);
           });
 
-          // Convert back to array
           const aggregated = Array.from(portMap.values());
 
-          // Optional: Sort by most active ports
-          // aggregated.sort((a, b) => b.packets - a.packets);
-
-          // Keep top 20 unique ports to avoid overcrowding
           return aggregated.slice(-20);
         });
       }
@@ -333,11 +330,10 @@ const App = () => {
       // 3. Graph Updates (Throttled to 5s)
       if (graphUpdates.length > 0 && Date.now() - lastGraphUpdate.current > 5000) {
         lastGraphUpdate.current = Date.now();
-        console.log(`[GraphDebug] Processing ${graphUpdates.length} graph edges from batch of ${latestBatch.length}`); // ADDED: Log how many graphUpdates found
+        console.log(`[GraphDebug] Processing ${graphUpdates.length} graph edges from batch of ${latestBatch.length}`);
         setGraphData(prev => {
           const now = Date.now();
 
-          // Handle possibility that prev.nodes/links might be empty or undefined
           const currentNodes = prev.nodes || [];
           const currentLinks = prev.links || [];
 
@@ -347,14 +343,11 @@ const App = () => {
           const isPrivateIP = (nodeId) => {
             if (!nodeId) return false;
 
-            // Strip port for IPv4 (simple heuristic: has dot and colon)
             let ip = nodeId;
             if (nodeId.includes('.') && nodeId.includes(':')) {
               ip = nodeId.split(':')[0];
             }
-            // Handle localhost/ipv6 explicitly
             if (ip === "::1" || ip === "localhost" || ip === "127.0.0.1") return true;
-            // Handle ::1 with port (naive check)
             if (nodeId.startsWith("::1")) return true;
 
             const parts = ip.split('.');
@@ -368,10 +361,8 @@ const App = () => {
           };
 
           graphUpdates.forEach(edge => {
-            // Validate edge data
             if (!edge.source || !edge.target) return;
 
-            // Update Nodes
             [edge.source, edge.target].forEach(ip => {
               if (!nodes.has(ip)) {
                 nodes.set(ip, {
@@ -383,13 +374,12 @@ const App = () => {
               } else {
                 const n = nodes.get(ip);
                 n.lastSeen = now;
-                n.val = (n.val || 1) + 0.1; // Slowly grow size
+                n.val = (n.val || 1) + 0.1;
               }
             });
 
-            // Update Link
             const linkId = `${edge.source}-${edge.target}-${edge.dst_port}`;
-            const weight = Number(edge.weight) || 1; // Cast to Number
+            const weight = Number(edge.weight) || 1;
 
             if (links.has(linkId)) {
               const l = links.get(linkId);
@@ -407,12 +397,9 @@ const App = () => {
             }
           });
 
-          // Prune Stale Items (> 60s)
           for (const [id, node] of nodes) {
             if (now - (node.lastSeen || 0) > 60000) nodes.delete(id);
           }
-
-          // Prune Stale Links & Orphaned Links
           for (const [id, link] of links) {
             const sourceId = link.source.id || link.source;
             const targetId = link.target.id || link.target;
@@ -428,7 +415,7 @@ const App = () => {
           for (const link of links.values()) {
             const sourceId = link.source.id || link.source;
             const targetId = link.target.id || link.target;
-            const pairId = [sourceId, targetId].sort().join('-'); // Consistent key regardless of direction
+            const pairId = [sourceId, targetId].sort().join('-');
 
             if (!linksByPair.has(pairId)) linksByPair.set(pairId, []);
             linksByPair.get(pairId).push(link);
@@ -439,20 +426,15 @@ const App = () => {
             const count = pairLinks.length;
             if (count > 1) {
               pairLinks.forEach((link, i) => {
-                // Spread curvature: 0, 0.2, -0.2, 0.4, -0.4...
-                // If self-loop, just regular curvature
                 const isSelfLoop = (link.source.id || link.source) === (link.target.id || link.target);
                 if (isSelfLoop) {
                   link.curvature = 0.2 + (i * 0.1);
                 } else {
-                  // Alternating curvature for multi-links
                   link.curvature = 0.1 + (i * 0.15);
                 }
               });
             } else {
-              // Single link
               const isSelfLoop = (pairLinks[0].source.id || pairLinks[0].source) === (pairLinks[0].target.id || pairLinks[0].target);
-              // Standard curvature for self-loops
               pairLinks[0].curvature = isSelfLoop ? 0.2 : 0;
             }
           }
@@ -533,7 +515,6 @@ Encryption: ${r.encryption}
     }
   };
 
-  // --- Components ---
 
 
 
@@ -633,6 +614,53 @@ Encryption: ${r.encryption}
                 )}
               </div>
 
+              {/* Capture Interface Selector */}
+              <div className="bg-white/5 p-4 border border-white/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold">Capture Interface</h3>
+                  <button
+                    onClick={fetchInterfaces}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 border border-indigo-500/30 px-2 py-1 transition-colors hover:bg-indigo-500/10"
+                  >
+                    <Activity className="w-3 h-3" /> Refresh
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">Select the network interface to capture traffic from. Takes effect on next start.</p>
+                {interfaces.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Loading interfaces…</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {interfaces.map(iface => {
+                      const selected = (whitelist.capture_interface || 'wlo1') === iface.name;
+                      const isUp = iface.up || iface.state === 'UP';
+                      return (
+                        <button
+                          key={iface.name}
+                          onClick={() => {
+                            const updated = { ...whitelist, capture_interface: iface.name };
+                            setWhitelist(updated);
+                            saveWhitelist(updated);
+                          }}
+                          className={`flex items-center justify-between px-3 py-2 border text-left transition-all ${selected
+                            ? 'border-indigo-500 bg-indigo-500/15 text-slate-100'
+                            : 'border-white/10 hover:bg-white/5 text-slate-400'
+                            }`}
+                        >
+                          <div>
+                            <p className="text-sm font-bold font-mono">{iface.name}</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{iface.type}</p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 ${isUp ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 bg-white/5'
+                            }`}>
+                            {isUp ? 'UP' : 'DOWN'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="bg-white/5 p-4 border border-white/10">
                 <h3 className="font-bold mb-4">Whitelist Configuration</h3>
                 <label className="block text-sm text-secondary mb-1">Whitelisted Ports (comma or space separated)</label>
@@ -710,13 +738,13 @@ Encryption: ${r.encryption}
         </div>
       )}
 
-      {/* Background Gradients - Subtle */}
+      {/* Background Gradients*/}
       <div className="fixed inset-0 pointer-events-none opacity-20 z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 blur-[120px]" />
       </div>
 
-      {/* Header - Boxy */}
+      {/* Header*/}
       <header className="flex justify-between items-center border-b border-white/10 bg-[#0B0F19] relative z-20 h-16">
         <div className="flex items-center h-full px-6 border-r border-white/10 bg-white/[0.02]">
 
@@ -804,13 +832,13 @@ Encryption: ${r.encryption}
         </div>
       </header>
 
-      {/* Main Grid - Boxy, No Gap */}
+      {/* Main Grid*/}
       <main className="grid grid-cols-12 flex-grow relative z-10 border-b border-white/10 overflow-hidden min-h-0">
 
-        {/* Left Column: Visuals */}
+        {/* Left Column*/}
         <div className="col-span-8 flex flex-col border-r border-white/10 overflow-hidden h-full">
 
-          {/* Top Row: Charts */}
+          {/* Top Row*/}
           <div className="grid grid-cols-2 h-72 border-b border-white/10 flex-shrink-0">
             <ChartContainer title="Traffic Volume" className="border-r border-white/10">
               <ResponsiveContainer width="100%" height="100%">
@@ -870,7 +898,7 @@ Encryption: ${r.encryption}
             </ChartContainer>
           </div>
 
-          {/* Bottom Row: Content (Table/Graph) Area */}
+          {/* Bottom Row*/}
           <div className="flex-1 min-h-0 relative bg-black/40">
             {viewMode === 'list' && (
               <SecurityTable
@@ -906,7 +934,7 @@ Encryption: ${r.encryption}
           </div>
         </div>
 
-        {/* Right Column: AI Assistant */}
+        {/* Right Column*/}
         <div className="col-span-4 h-[calc(100vh-64px)] bg-[#0B0F19] overflow-hidden sticky top-16 flex flex-col">
           <BentoCard
             title="Flow AI"

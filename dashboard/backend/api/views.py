@@ -10,12 +10,39 @@ import os
 import re
 from pathlib import Path
 
+class NetworkInterfacesView(APIView):
+    """Returns available network interfaces from the OS."""
+    def get(self, request):
+        try:
+            result = subprocess.run(
+                ["ip", "-j", "link", "show"],
+                capture_output=True, text=True, timeout=5
+            )
+            raw = json.loads(result.stdout or "[]")
+            ifaces = []
+            for iface in raw:
+                name = iface.get("ifname", "")
+                if not name or name == "lo":
+                    continue
+                link_type = iface.get("link_type", "ether")
+                flags = iface.get("flags", [])
+                state = iface.get("operstate", "UNKNOWN")
+                ifaces.append({
+                    "name": name,
+                    "type": link_type,
+                    "state": state,
+                    "up": "UP" in flags,
+                })
+            ifaces.insert(0, {"name": "lo", "type": "loopback", "state": "UNKNOWN", "up": True})
+            return Response(ifaces, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class PacketUpdateView(APIView):
     def post(self, request):
         channel_layer = get_channel_layer()
         data = request.data
         
-        # Pathway might send a single object or a list
         updates = data if isinstance(data, list) else [data]
         
         for update in updates:
@@ -37,7 +64,6 @@ class ChatProxyView(APIView):
             return Response({"error": "No query provided"}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Forward query to Pathway's REST connector
             response = requests.post(
                 "http://localhost:8011",
                 json={
@@ -76,7 +102,7 @@ class NetworkDevicesView(APIView):
                 match = re.search(r'\(([\d\.]+)\) at ([\w:]+)', line)
                 if match:
                     ip = match.group(1)
-                    if ip != host_ip:  # Don't add host again if found in ARP
+                    if ip != host_ip: 
                         devices.append({'ip': ip, 'mac': match.group(2)})
             
             unique_devices = []
@@ -119,7 +145,7 @@ class SpoofStartView(APIView):
             global SPOOF_PROCESSES
             
             for target in targets:
-                if target == host_ip: continue # Do not arpspoof ourselves
+                if target == host_ip: continue
                 p1 = subprocess.Popen(['sudo', '-n', 'arpspoof', '-i', interface, '-t', target, gateway])
                 p2 = subprocess.Popen(['sudo', '-n', 'arpspoof', '-i', interface, '-t', gateway, target])
                 SPOOF_PROCESSES.extend([p1, p2])
