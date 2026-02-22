@@ -1,4 +1,4 @@
-# NetFlow Sentinel
+# NetFlow
 
 A real-time network monitoring and anomaly detection system with an AI-powered assistant. It captures live traffic, analyses it using a streaming data engine, and presents everything in a dark-themed browser dashboard.
 
@@ -6,7 +6,7 @@ A real-time network monitoring and anomaly detection system with an AI-powered a
 
 ## What it does
 
-NetFlow Sentinel watches your network in real time. It picks up every packet on a chosen interface, groups them into flows (conversations between two endpoints), and continuously scores each flow for suspicious behaviour. Anything that looks anomalous shows up immediately in the dashboard, and you can ask the built-in AI assistant questions about what it found.
+NetFlow watches your network in real time. It picks up every packet on a chosen interface, groups them into flows (conversations between two endpoints), and continuously scores each flow for suspicious behaviour. Anything that looks anomalous shows up immediately in the dashboard, and you can ask the built-in Netflow AI questions about what it found.
 
 ---
 
@@ -17,23 +17,23 @@ Network interface
       │
       ▼
 live_capture.py  ──────────────────────────────────────────────────────┐
-(tshark wrapper)                                                        │
-      │ JSONL stream                                                     │
-      ▼                                                                  │
+(tshark wrapper)                                                       │
+      │ JSONL stream                                                   │
+      ▼                                                                │
 main.py (Pathway streaming engine, port 8011)                          │
   ├── Feature extraction (TCP flags, TTL, packet size, encryption …)   │
-  ├── Per-flow aggregation & anomaly scoring                            │
+  ├── Per-flow aggregation & anomaly scoring                           │
   ├── Whitelisting (dynamic, hot-reloaded)                             │
-  ├── CSV log writers (togglable)                                       │
-  └── RAG context builder for the AI assistant                          │
-      │ HTTP POST per update                                             │
-      ▼                                                                  │
-Django backend (port 8000)                                              │
-  ├── WebSocket broadcaster → connected browsers                        │
+  ├── CSV log writers (togglable)                                      │
+  └── RAG context builder for the Netflow AI                           │
+      │ HTTP POST per update                                           │
+      ▼                                                                │
+Django backend (port 8000)                                             │
+  ├── WebSocket broadcaster → connected browsers                       │
   ├── REST API (whitelist, devices, interfaces, ARP spoof control)     │
   └── Chat proxy → Pathway LLM endpoint                                │
-      │                                                                  │
-      ▼                                                                  │
+      │                                                                │
+      ▼                                                                │
 React dashboard (port 5173) ◄──────────────────────────────────────────┘
   ├── Live flow table with anomaly highlighting
   ├── Traffic & anomaly score charts
@@ -328,7 +328,3 @@ Netflow/
 - Port 8000 may be in use. `start_sentinel.py` kills it on startup automatically
 
 ---
-
-## License
-
-MIT
