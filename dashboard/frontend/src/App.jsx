@@ -22,11 +22,11 @@ const isAnomalous = (flow) => {
 
 
 const BentoCard = React.memo(({ children, className = "", bodyClassName = "", title, icon, actions }) => (
-  <div className={`bg-gray-900/40 backdrop-blur-xl border-r border-b border-white/10 flex flex-col hover:bg-white/[0.02] transition-colors duration-300 group ${className}`}>
+  <div className={`bg-[var(--bg-card)] backdrop-blur-xl border-r border-b border-[var(--border-color)] flex flex-col hover:bg-[var(--bg-card-hover)] transition-colors duration-300 group ${className}`}>
     {(title || actions) && (
-      <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 flex-shrink-0">
+      <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-card-hover)] flex-shrink-0">
         {title && (
-          <h3 className="font-bold text-lg flex items-center gap-3 text-slate-100 group-hover:text-primary transition-colors tracking-tight">
+          <h3 className="font-bold text-lg flex items-center gap-3 text-[var(--text-primary)] group-hover:text-primary transition-colors tracking-tight">
             {icon} {title}
           </h3>
         )}
@@ -38,14 +38,14 @@ const BentoCard = React.memo(({ children, className = "", bodyClassName = "", ti
 ));
 
 const StatCard = React.memo(({ label, value, icon, color = "text-primary", subtext }) => (
-  <div className="bg-gray-900/40 backdrop-blur-md border-l border-white/10 p-4 flex items-center gap-4 hover:bg-white/5 transition-colors group h-full">
-    <div className={`p-2 bg-white/5 ${color} group-hover:scale-105 transition-transform duration-300`}>
+  <div className="bg-[var(--bg-card)] backdrop-blur-md border-l border-[var(--border-color)] p-4 flex items-center gap-4 hover:bg-[var(--bg-card-hover)] transition-colors group h-full">
+    <div className={`p-2 bg-[var(--bg-card-hover)] ${color} group-hover:scale-105 transition-transform duration-300`}>
       {icon}
     </div>
     <div className="min-w-0">
-      <p className="text-secondary text-[10px] uppercase tracking-wider font-semibold truncate">{label}</p>
-      <p className="text-xl font-bold font-mono text-slate-100 truncate">{value}</p>
-      {subtext && <p className="text-[10px] text-secondary mt-0.5 truncate">{subtext}</p>}
+      <p className="text-[var(--text-secondary)] text-[10px] uppercase tracking-wider font-semibold truncate">{label}</p>
+      <p className="text-xl font-bold font-mono text-[var(--text-primary)] truncate">{value}</p>
+      {subtext && <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">{subtext}</p>}
     </div>
   </div>
 ));
@@ -60,9 +60,9 @@ const ChartContainer = React.memo(({ title, children, className }) => (
 
 const SecurityTable = React.memo(({ flows, formatTime, selectedRows = [], onRowSelect }) => (
   <BentoCard title="RTS Table" icon={<Terminal className="w-5 h-5 text-indigo-400" />} className="flex-1 overflow-hidden h-full">
-    <div className="overflow-x-auto h-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent will-change-transform translate-z-0 overflow-y-auto">
+    <div className="overflow-x-auto h-full scrollbar-thin scrollbar-thumb-[var(--scrollbar-thumb)] scrollbar-track-transparent will-change-transform translate-z-0 overflow-y-auto">
       <table className="w-full text-left border-collapse table-fixed">
-        <thead className="text-xs uppercase text-secondary bg-[#0B0F19] sticky top-0 backdrop-blur-sm z-20">
+        <thead className="text-xs uppercase text-[var(--text-secondary)] bg-[var(--bg-sidebar)] sticky top-0 backdrop-blur-sm z-20 border-b border-[var(--border-color)]">
           <tr>
             <th className="px-6 py-4 font-bold tracking-wider w-[120px]">Time</th>
             <th className="px-6 py-4 font-bold tracking-wider w-1/3">Flow (Source → Dest)</th>
@@ -72,37 +72,37 @@ const SecurityTable = React.memo(({ flows, formatTime, selectedRows = [], onRowS
             <th className="px-6 py-4 font-bold tracking-wider">Latest Info</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/5 text-sm">
+        <tbody className="text-sm">
           {flows.map((flow, i) => {
             const isSelected = selectedRows.some(r => r.flow === flow.flow);
             return (
               <tr
                 key={flow.flow || i}
                 onClick={() => onRowSelect(flow)}
-                className={`transition-colors cursor-pointer group h-14 ${isSelected ? 'bg-indigo-500/20 border-l-2 border-indigo-500' : 'hover:bg-white/5'}`}
+                className={`transition-colors cursor-pointer group h-14 border-b border-[var(--border-color)] last:border-0 ${isSelected ? 'bg-indigo-500/15 border-l border-indigo-500' : 'hover:bg-[var(--bg-card-hover)]'}`}
               >
-                <td className="px-6 py-3 font-mono text-xs text-secondary group-hover:text-slate-300">
+                <td className="px-6 py-3 font-mono text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">
                   {formatTime(flow.last_packet_time)}
                 </td>
-                <td className="px-6 py-3 font-mono text-indigo-200 truncate">{flow.flow}</td>
+                <td className="px-6 py-3 font-mono text-[var(--text-accent)] truncate">{flow.flow}</td>
                 <td className="px-6 py-3">
-                  <span className={`px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wide ${flow.encryption === 'Encrypted' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  <span className={`px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wide ${flow.encryption === 'Encrypted' ? 'bg-emerald-500/10 text-[var(--success-text)] border border-emerald-500/20' : 'bg-amber-500/10 text-[var(--warning-text)] border border-amber-500/20'
                     }`}>
                     {flow.encryption}
                   </span>
                 </td>
                 <td className="px-6 py-3">
                   {isAnomalous(flow) ? (
-                    <div className="flex items-center gap-2 text-rose-400 bg-rose-500/10 px-2 py-1 rounded-md border border-rose-500/20 w-fit">
+                    <div className="flex items-center gap-2 text-[var(--danger-text)] bg-rose-500/10 px-2 py-1 rounded-md border border-rose-500/20 w-fit">
                       <AlertTriangle className="w-3 h-3 animate-pulse" />
                       <span className="text-[10px] font-bold">ANOMALY</span>
                     </div>
                   ) : (
-                    <Shield className="w-4 h-4 text-emerald-500/50" />
+                    <Shield className="w-4 h-4 text-[var(--success-text)] opacity-60" />
                   )}
                 </td>
-                <td className="px-6 py-3 font-mono">{flow.packet_count}</td>
-                <td className="px-6 py-3 text-xs text-secondary truncate max-w-[200px]">
+                <td className="px-6 py-3 font-mono text-[var(--text-primary)]">{flow.packet_count}</td>
+                <td className="px-6 py-3 text-xs text-[var(--text-secondary)] truncate max-w-[200px]">
                   {flow.last_packet_info}
                 </td>
               </tr>
@@ -133,6 +133,7 @@ const App = () => {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [portAlerts, setPortAlerts] = useState([]);
   const [viewMode, setViewMode] = useState('list');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
   const messageQueue = useRef([]);
   const lastGraphUpdate = useRef(0);
 
@@ -153,6 +154,11 @@ const App = () => {
   const [isSpoofingLoading, setIsSpoofingLoading] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const [interfaces, setInterfaces] = useState([]);
+
+  useEffect(() => {
+    document.documentElement.className = theme === 'light' ? 'light-theme' : '';
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const fetchDevices = async () => {
     setIsLoadingDevices(true);
@@ -520,59 +526,59 @@ Encryption: ${r.encryption}
 
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white font-inter selection:bg-indigo-500/30 overflow-hidden">
+    <div className="h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-primary)] font-inter selection:bg-indigo-500/30 overflow-hidden">
 
       {/* Modals Overlay */}
       {setupStep > 0 && (
-        <div className="fixed inset-0 z-50 bg-[#0B0F19]/90 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-white/10 p-8 max-w-2xl w-full">
+        <div className="fixed inset-0 z-50 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-[var(--bg-main)] border border-[var(--border-color)] p-8 max-w-2xl w-full">
             {setupStep === 1 && (
               <>
-                <h2 className="text-2xl font-bold mb-4 text-slate-100">Setup Monitoring</h2>
-                <p className="text-secondary mb-8">Choose how you want to capture network traffic.</p>
+                <h2 className="text-2xl font-bold mb-4 text-[var(--text-primary)]">Setup Monitoring</h2>
+                <p className="text-[var(--text-secondary)] mb-8">Choose how you want to capture network traffic.</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => { setMonitoringMethod(1); setSetupStep(0); setIsMonitoring(true); }} className="p-6 border border-white/10 hover:border-indigo-500 hover:bg-indigo-500/10 transition-colors text-left group">
+                  <button onClick={() => { setMonitoringMethod(1); setSetupStep(0); setIsMonitoring(true); }} className="p-6 border border-[var(--border-color)] hover:border-indigo-500 hover:bg-indigo-500/10 transition-colors text-left group">
                     <Activity className="w-8 h-8 text-indigo-400 mb-4 group-hover:scale-110 transition-transform" />
                     <h3 className="text-lg font-bold mb-2">Method 1 (Default)</h3>
-                    <p className="text-sm text-secondary">Monitor traffic routing directly through this host interface.</p>
+                    <p className="text-sm text-[var(--text-secondary)]">Monitor traffic routing directly through this host interface.</p>
                   </button>
-                  <button onClick={() => { setMonitoringMethod(2); setSetupStep(2); fetchDevices(); }} className="p-6 border border-white/10 hover:border-rose-500 hover:bg-rose-500/10 transition-colors text-left group">
+                  <button onClick={() => { setMonitoringMethod(2); setSetupStep(2); fetchDevices(); }} className="p-6 border border-[var(--border-color)] hover:border-rose-500 hover:bg-rose-500/10 transition-colors text-left group">
                     <Network className="w-8 h-8 text-rose-400 mb-4 group-hover:scale-110 transition-transform" />
                     <h3 className="text-lg font-bold mb-2">Method 2 (ARP Spoofing)</h3>
-                    <p className="text-sm text-secondary">Intercept traffic from other devices on the local network.</p>
+                    <p className="text-sm text-[var(--text-secondary)]">Intercept traffic from other devices on the local network.</p>
                   </button>
                 </div>
               </>
             )}
             {setupStep === 2 && (
               <>
-                <h2 className="text-2xl font-bold mb-4 text-slate-100">Select Devices</h2>
-                <p className="text-secondary mb-4">Select the target devices to intercept traffic from.</p>
+                <h2 className="text-2xl font-bold mb-4 text-[var(--text-primary)]">Select Devices</h2>
+                <p className="text-[var(--text-secondary)] mb-4">Select the target devices to intercept traffic from.</p>
                 {isLoadingDevices ? (
                   <div className="flex items-center justify-center p-12 text-indigo-400 gap-3">
                     <Loader2 className="w-6 h-6 animate-spin" /> Fetching ARP table...
                   </div>
                 ) : (
-                  <div className="max-h-64 overflow-y-auto mb-6 border border-white/10">
+                  <div className="max-h-64 overflow-y-auto mb-6 border border-[var(--border-color)]">
                     <table className="w-full text-left text-sm">
-                      <thead className="bg-white/5 sticky top-0">
+                      <thead className="bg-[var(--bg-card-hover)] sticky top-0">
                         <tr>
                           <th className="p-3">Select</th>
                           <th className="p-3">IP Address</th>
                           <th className="p-3">MAC Address</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="">
                         {devices.map(d => (
-                          <tr key={d.ip} className="hover:bg-white/5">
+                          <tr key={d.ip} className="hover:bg-[var(--bg-card-hover)] border-b border-[var(--border-color)] last:border-0">
                             <td className="p-3">
                               <input type="checkbox" checked={selectedTargets.some(t => t.ip === d.ip)} onChange={(e) => {
                                 if (e.target.checked) setSelectedTargets([...selectedTargets, d]);
                                 else setSelectedTargets(selectedTargets.filter(t => t.ip !== d.ip));
                               }} className="accent-rose-500" />
                             </td>
-                            <td className="p-3 font-mono text-indigo-300">{d.ip}</td>
-                            <td className="p-3 font-mono text-secondary">{d.mac}</td>
+                            <td className="p-3 font-mono text-[var(--text-accent)]">{d.ip}</td>
+                            <td className="p-3 font-mono text-[var(--text-secondary)]">{d.mac}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -580,7 +586,7 @@ Encryption: ${r.encryption}
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <button onClick={() => setSetupStep(1)} className="px-6 py-2 text-sm text-secondary hover:text-white transition-colors">Back</button>
+                  <button onClick={() => setSetupStep(1)} className="px-6 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Back</button>
                   <button disabled={selectedTargets.length === 0 || isSpoofingLoading} onClick={() => startSpoofing(selectedTargets)} className="px-6 py-2 text-sm bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors disabled:opacity-50 flex items-center gap-2">
                     {isSpoofingLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Executing sysctl & arpspoof...</> : "Start Interception"}
                   </button>
@@ -592,32 +598,50 @@ Encryption: ${r.encryption}
       )}
 
       {showSettings && (
-        <div className="fixed inset-0 z-50 bg-[#0B0F19]/90 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-white/10 p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-6 text-slate-100 flex items-center gap-3"><Settings className="w-6 h-6 text-indigo-400" /> Settings</h2>
+        <div className="fixed inset-0 z-50 bg-[var(--bg-sidebar)]/90 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-[var(--bg-main)] border border-[var(--border-color)] p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-6 text-[var(--text-primary)] flex items-center gap-3"><Settings className="w-6 h-6 text-indigo-400" /> Settings</h2>
 
             <div className="space-y-6">
-              <div className="bg-white/5 p-4 border border-white/10">
-                <h3 className="font-bold mb-2">Monitoring Method</h3>
+              <div className="bg-[var(--bg-card-hover)] p-4 border border-[var(--border-color)]">
+                <h3 className="font-bold mb-4 text-[var(--text-primary)]">Theme</h3>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={`px-4 py-2 text-sm border flex items-center gap-2 transition-colors ${theme === 'dark' ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-[var(--border-color)] hover:bg-white/5 text-[var(--text-secondary)]'}`}
+                  >
+                    <div className="w-3 h-3 bg-gray-900 border border-white/20"></div> Dark Mode
+                  </button>
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={`px-4 py-2 text-sm border flex items-center gap-2 transition-colors ${theme === 'light' ? 'border-rose-500 bg-rose-500/20 text-rose-300' : 'border-[var(--border-color)] hover:bg-white/5 text-[var(--text-secondary)]'}`}
+                  >
+                    <div className="w-3 h-3 bg-white border border-gray-300"></div> Light Mode
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-[var(--bg-card-hover)] p-4 border border-[var(--border-color)]">
+                <h3 className="font-bold mb-2 text-[var(--text-primary)]">Monitoring Method</h3>
                 <div className="flex gap-4 mb-4">
-                  <button onClick={() => { stopSpoofing(); setMonitoringMethod(1); setSetupStep(0); setIsMonitoring(true); setShowSettings(false); }} className={`px-4 py-2 text-sm border ${monitoringMethod === 1 ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 hover:bg-white/5'} transition-colors`}>Method 1 (Local)</button>
-                  <button onClick={() => { stopSpoofing(); setMonitoringMethod(2); setSetupStep(2); fetchDevices(); setShowSettings(false); }} className={`px-4 py-2 text-sm border ${monitoringMethod === 2 ? 'border-rose-500 bg-rose-500/20 text-rose-300' : 'border-white/10 hover:bg-white/5'} transition-colors`}>Method 2 (ARP Spoofing)</button>
+                  <button onClick={() => { stopSpoofing(); setMonitoringMethod(1); setSetupStep(0); setIsMonitoring(true); setShowSettings(false); }} className={`px-4 py-2 text-sm border ${monitoringMethod === 1 ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-[var(--border-color)] hover:bg-[var(--bg-card-hover)]'} transition-colors`}>Method 1 (Local)</button>
+                  <button onClick={() => { stopSpoofing(); setMonitoringMethod(2); setSetupStep(2); fetchDevices(); setShowSettings(false); }} className={`px-4 py-2 text-sm border ${monitoringMethod === 2 ? 'border-rose-500 bg-rose-500/20 text-rose-300' : 'border-[var(--border-color)] hover:bg-[var(--bg-card-hover)]'} transition-colors`}>Method 2 (ARP Spoofing)</button>
                 </div>
                 {monitoringMethod === 2 && (
                   <div className="mt-4">
-                    <p className="text-sm font-bold text-secondary mb-2">Active Targets:</p>
+                    <p className="text-sm font-bold text-[var(--text-secondary)] mb-2">Active Targets:</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedTargets.map(t => <span key={t.ip} className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-1 text-xs font-mono">{t.ip}</span>)}
-                      {selectedTargets.length === 0 && <span className="text-xs text-secondary">No targets selected.</span>}
+                      {selectedTargets.length === 0 && <span className="text-xs text-[var(--text-secondary)]">No targets selected.</span>}
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Capture Interface Selector */}
-              <div className="bg-white/5 p-4 border border-white/10">
+              <div className="bg-[var(--bg-card-hover)] p-4 border border-[var(--border-color)]">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold">Capture Interface</h3>
+                  <h3 className="font-bold text-[var(--text-primary)]">Capture Interface</h3>
                   <button
                     onClick={fetchInterfaces}
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 border border-indigo-500/30 px-2 py-1 transition-colors hover:bg-indigo-500/10"
@@ -625,9 +649,9 @@ Encryption: ${r.encryption}
                     <Activity className="w-3 h-3" /> Refresh
                   </button>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">Select the network interface to capture traffic from. Takes effect on next start.</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-3">Select the network interface to capture traffic from. Takes effect on next start.</p>
                 {interfaces.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Loading interfaces…</p>
+                  <p className="text-xs text-[var(--text-secondary)] italic">Loading interfaces…</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {interfaces.map(iface => {
@@ -642,15 +666,15 @@ Encryption: ${r.encryption}
                             saveWhitelist(updated);
                           }}
                           className={`flex items-center justify-between px-3 py-2 border text-left transition-all ${selected
-                            ? 'border-indigo-500 bg-indigo-500/15 text-slate-100'
-                            : 'border-white/10 hover:bg-white/5 text-slate-400'
+                            ? 'border-indigo-500 bg-indigo-500/15 text-[var(--text-primary)]'
+                            : 'border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-[var(--text-secondary)]'
                             }`}
                         >
                           <div>
                             <p className="text-sm font-bold font-mono">{iface.name}</p>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{iface.type}</p>
+                            <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">{iface.type}</p>
                           </div>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 ${isUp ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 bg-white/5'
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 ${isUp ? 'text-emerald-400 bg-emerald-400/10' : 'text-[var(--text-secondary)] bg-[var(--bg-card-hover)]'
                             }`}>
                             {isUp ? 'UP' : 'DOWN'}
                           </span>
@@ -661,9 +685,9 @@ Encryption: ${r.encryption}
                 )}
               </div>
 
-              <div className="bg-white/5 p-4 border border-white/10">
-                <h3 className="font-bold mb-4">Whitelist Configuration</h3>
-                <label className="block text-sm text-secondary mb-1">Whitelisted Ports (comma or space separated)</label>
+              <div className="bg-[var(--bg-card-hover)] p-4 border border-[var(--border-color)]">
+                <h3 className="font-bold mb-4 text-[var(--text-primary)]">Whitelist Configuration</h3>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1">Whitelisted Ports (comma or space separated)</label>
                 <input
                   type="text"
                   value={portsText}
@@ -673,11 +697,11 @@ Encryption: ${r.encryption}
                     setWhitelist(prev => ({ ...prev, ports: parsed }));
                   }}
                   placeholder="e.g. 8000, 8011 443"
-                  className="w-full bg-black/40 border border-white/10 p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 mb-4 font-mono"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] p-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-indigo-500 mb-4 font-mono"
                 />
 
-                <label className="block text-sm text-secondary mb-1">Anomaly Score Threshold</label>
-                <input type="number" step="0.1" min="0" max="1" value={whitelist.anomaly_threshold} onChange={(e) => setWhitelist({ ...whitelist, anomaly_threshold: parseFloat(e.target.value) || 0 })} className="w-full bg-black/40 border border-white/10 p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 mb-4 font-mono" />
+                <label className="block text-sm text-[var(--text-secondary)] mb-1">Anomaly Score Threshold</label>
+                <input type="number" step="0.1" min="0" max="1" value={whitelist.anomaly_threshold} onChange={(e) => setWhitelist({ ...whitelist, anomaly_threshold: parseFloat(e.target.value) || 0 })} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] p-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-indigo-500 mb-4 font-mono" />
 
                 <button
                   onClick={() => {
@@ -691,9 +715,9 @@ Encryption: ${r.encryption}
               </div>
 
               {/* Logging Toggles */}
-              <div className="bg-white/5 p-4 border border-white/10">
-                <h3 className="font-bold mb-1">Log Files</h3>
-                <p className="text-xs text-slate-500 mb-4">Disable logs to reduce disk I/O. Changes take effect within ~1 second.</p>
+              <div className="bg-[var(--bg-card-hover)] p-4 border border-[var(--border-color)]">
+                <h3 className="font-bold mb-1 text-[var(--text-primary)]">Log Files</h3>
+                <p className="text-xs text-[var(--text-secondary)] mb-4">Disable logs to reduce disk I/O. Changes take effect within ~1 second.</p>
                 <div className="space-y-3">
                   {[
                     { key: 'all_packets', label: 'All Packets', path: 'logs/all_packets.csv', desc: 'Every raw captured packet' },
@@ -705,9 +729,9 @@ Encryption: ${r.encryption}
                     return (
                       <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-white/[0.06] last:border-0">
                         <div>
-                          <p className="text-sm font-semibold text-slate-200">{label}</p>
-                          <p className="text-[11px] text-slate-500 font-mono">{path}</p>
-                          <p className="text-[11px] text-slate-500">{desc}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] font-mono">{path}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)]">{desc}</p>
                         </div>
                         <button
                           onClick={() => {
@@ -718,7 +742,7 @@ Encryption: ${r.encryption}
                             setWhitelist(updated);
                             saveWhitelist(updated);
                           }}
-                          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-indigo-500' : 'bg-white/10'
+                          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-indigo-500' : 'bg-[var(--bg-card-hover)]'
                             }`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'
@@ -732,7 +756,7 @@ Encryption: ${r.encryption}
             </div>
 
             <div className="mt-8 flex justify-end">
-              <button onClick={() => setShowSettings(false)} className="px-6 py-2 border border-white/10 hover:bg-white/5 text-sm transition-colors">Close</button>
+              <button onClick={() => setShowSettings(false)} className="px-6 py-2 border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] text-sm transition-colors text-[var(--text-primary)]">Close</button>
             </div>
           </div>
         </div>
@@ -740,16 +764,16 @@ Encryption: ${r.encryption}
 
       {/* Background Gradients*/}
       <div className="fixed inset-0 pointer-events-none opacity-20 z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/5 blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 blur-[120px]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/10 blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 blur-[120px]" />
       </div>
 
       {/* Header*/}
-      <header className="flex justify-between items-center border-b border-white/10 bg-[#0B0F19] relative z-20 h-16">
-        <div className="flex items-center h-full px-6 border-r border-white/10 bg-white/[0.02]">
+      <header className="flex justify-between items-center border-b border-[var(--border-color)] bg-[var(--bg-header)] relative z-20 h-16">
+        <div className="flex items-center h-full px-6 border-r border-[var(--border-color)] bg-[var(--bg-card-hover)]">
 
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-100">
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
               NETFLOW
             </h1>
           </div>
@@ -757,59 +781,59 @@ Encryption: ${r.encryption}
 
         <div className="flex items-center h-full flex-grow justify-end">
           {/* View Toggles */}
-          <div className="flex h-full border-l border-white/10">
+          <div className="flex h-full border-l border-[var(--border-color)]">
             <button
               onClick={() => setViewMode('list')}
-              className={`px-6 h-full text-xs font-bold transition-colors flex items-center gap-2 border-r border-white/10 ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-secondary hover:bg-white/5'}`}
+              className={`px-6 h-full text-xs font-bold transition-colors flex items-center gap-2 border-r border-[var(--border-color)] ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-[var(--text-secondary)] hover:bg-white/5'}`}
             >
               <Terminal className="w-4 h-4" /> LIST
             </button>
             <button
               onClick={() => setViewMode('graph')}
-              className={`px-6 h-full text-xs font-bold transition-colors flex items-center gap-2 ${viewMode === 'graph' ? 'bg-indigo-600 text-white' : 'text-secondary hover:bg-white/5'}`}
+              className={`px-6 h-full text-xs font-bold transition-colors flex items-center gap-2 ${viewMode === 'graph' ? 'bg-indigo-600 text-white' : 'text-[var(--text-secondary)] hover:bg-white/5'}`}
             >
               <Network className="w-4 h-4" /> GRAPH
             </button>
           </div>
 
           {/* Stats Row */}
-          <div className="flex h-full border-white/10 justify-center items-center gap-6 bg-[#0B0F19]">
+          <div className="flex h-full border-[var(--border-color)] justify-center items-center gap-6 bg-[var(--bg-header)]">
             <div className="flex flex-col h-full">
               {/* <span className="text-[10px] text-secondary uppercase font-bold tracking-widest mb-1 opacity-50">System Metrics</span> */}
-              <div className="flex h-full overflow-hidden border-r border-white/10 bg-black/20 fustat tracking-tight" >
+              <div className="flex h-full overflow-hidden border-r border-[var(--border-color)] bg-black/5 fustat tracking-tight" >
                 <StatCard
                   label="CPU"
                   value={`${systemStats.cpu}%`}
                   icon={<Activity className="w-3.5 h-3.5" />}
-                  color="text-indigo-400"
+                  color="text-[var(--text-accent)]"
                 />
                 <StatCard
                   label="RAM"
                   value={`${systemStats.ram}%`}
                   icon={<Database className="w-3.5 h-3.5" />}
-                  color="text-indigo-400"
+                  color="text-[var(--text-accent)]"
                 />
                 <StatCard
                   label="Live Flows"
                   value={flows.length}
                   icon={<Zap className="w-3.5 h-3.5" />}
-                  color="text-indigo-400"
+                  color="text-[var(--text-accent)]"
                 />
                 <StatCard
                   label="Anomalies"
                   value={stats.anomalies}
                   icon={<ShieldAlert className="w-3.5 h-3.5" />}
-                  color={stats.anomalies > 0 ? "text-rose-400" : "text-indigo-400"}
+                  color={stats.anomalies > 0 ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}
                 />
                 <StatCard
                   label="Secured"
                   value={`${stats.encryptedRatio.toFixed(1)}%`}
                   icon={<Lock className="w-3.5 h-3.5" />}
-                  color="text-emerald-400"
+                  color="text-[var(--success-text)]"
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2 px-4 border-l border-white/10">
+            <div className="flex items-center gap-2 px-4 border-l border-[var(--border-color)]">
               <button
                 onClick={() => {
                   if (monitoringMethod === 2) {
@@ -824,7 +848,7 @@ Encryption: ${r.encryption}
               >
                 {isMonitoring ? <Square className="w-4 h-4" fill="currentColor" /> : <Play className="w-4 h-4" fill="currentColor" />}
               </button>
-              <button onClick={() => setShowSettings(true)} className="p-2 border border-white/10 hover:bg-white/5 text-secondary hover:text-white transition-colors">
+              <button onClick={() => setShowSettings(true)} className="p-2 border border-[var(--border-color)] hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                 <Settings className="w-4 h-4" />
               </button>
             </div>
@@ -833,14 +857,14 @@ Encryption: ${r.encryption}
       </header>
 
       {/* Main Grid*/}
-      <main className="grid grid-cols-12 flex-grow relative z-10 border-b border-white/10 overflow-hidden min-h-0">
+      <main className="grid grid-cols-12 flex-grow relative z-10 border-b border-[var(--border-color)] overflow-hidden min-h-0">
 
         {/* Left Column*/}
-        <div className="col-span-8 flex flex-col border-r border-white/10 overflow-hidden h-full">
+        <div className="col-span-8 flex flex-col border-r border-[var(--border-color)] overflow-hidden h-full">
 
           {/* Top Row*/}
-          <div className="grid grid-cols-2 h-72 border-b border-white/10 flex-shrink-0">
-            <ChartContainer title="Traffic Volume" className="border-r border-white/10">
+          <div className="grid grid-cols-2 h-72 border-b border-[var(--border-color)] flex-shrink-0">
+            <ChartContainer title="Traffic Volume" className="border-r border-[var(--border-color)]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartHistory}>
                   <defs>
@@ -850,9 +874,9 @@ Encryption: ${r.encryption}
                     </linearGradient>
                   </defs>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0px' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ color: '#94a3b8' }}
+                    contentStyle={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-color)', borderRadius: '0px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                    labelStyle={{ color: 'var(--text-secondary)' }}
                   />
                   <XAxis dataKey="time" hide />
                   <YAxis hide />
@@ -880,10 +904,10 @@ Encryption: ${r.encryption}
                     </linearGradient>
                   </defs>
                   <Tooltip
-                    cursor={{ fill: '#ffffff05' }}
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0px' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ color: '#94a3b8' }}
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    contentStyle={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-color)', borderRadius: '0px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                    labelStyle={{ color: 'var(--text-secondary)' }}
                   />
                   <Bar
                     dataKey="packets"
@@ -899,7 +923,7 @@ Encryption: ${r.encryption}
           </div>
 
           {/* Bottom Row*/}
-          <div className="flex-1 min-h-0 relative bg-black/40">
+          <div className="flex-1 min-h-0 relative bg-[var(--bg-input)]">
             {viewMode === 'list' && (
               <SecurityTable
                 flows={flows}
@@ -922,20 +946,20 @@ Encryption: ${r.encryption}
                 className="h-full border-none"
                 bodyClassName="h-full"
                 actions={
-                  <div className="text-xs text-secondary flex gap-4 font-mono">
+                  <div className="text-xs text-[var(--text-secondary)] flex gap-4 font-mono">
                     <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-none bg-blue-500"></span> Internal</span>
                     <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-none bg-rose-500"></span> External</span>
                   </div>
                 }
               >
-                <NetworkGraph nodes={graphData.nodes} links={graphData.links} />
+                <NetworkGraph nodes={graphData.nodes} links={graphData.links} theme={theme} />
               </BentoCard>
             )}
           </div>
         </div>
 
         {/* Right Column*/}
-        <div className="col-span-4 h-[calc(100vh-64px)] bg-[#0B0F19] overflow-hidden sticky top-16 flex flex-col">
+        <div className="col-span-4 h-[calc(100vh-64px)] bg-[var(--bg-sidebar)] overflow-hidden sticky top-16 flex flex-col">
           <BentoCard
             title="Flow AI"
             icon={<Bot className="w-5 h-5 text-emerald-400" />}
@@ -945,7 +969,7 @@ Encryption: ${r.encryption}
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="bg-black/40 border border-white/10 text-xs text-secondary focus:outline-none focus:border-indigo-500 py-1 px-2 font-mono scrollbar-thin rounded-none"
+                className="bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)] focus:outline-none focus:border-indigo-500 py-1 px-2 font-mono scrollbar-thin rounded-none"
               >
                 <option value="arcee-ai/trinity-large-preview:free">Trinity Large (Free)</option>
                 <option value="google/gemini-2.5-flash:free">Gemini 2.5 Flash</option>
@@ -955,8 +979,8 @@ Encryption: ${r.encryption}
               </select>
             }
           >
-            <div className="flex flex-col h-full bg-black/20 overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent min-h-0">
+            <div className="flex flex-col h-full bg-[var(--bg-sidebar)]/20 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[var(--scrollbar-thumb)] scrollbar-track-transparent min-h-0">
                 {chatMessages.map((msg, i) => (
                   <div
                     key={i}
@@ -965,7 +989,7 @@ Encryption: ${r.encryption}
                     <div
                       className={`max-w-[85%] p-3 text-sm border ${msg.role === 'user'
                         ? 'bg-indigo-600 text-white border-indigo-500'
-                        : 'bg-white/5 text-slate-200 border-white/10'
+                        : 'bg-[var(--bg-card-hover)] text-[var(--text-primary)] border-[var(--border-color)]'
                         }`}
                     >
                       {msg.role === 'assistant' && (
@@ -976,7 +1000,7 @@ Encryption: ${r.encryption}
                       <ReactMarkdown
                         components={{
                           code: ({ node, inline, className, children, ...props }) => (
-                            <code className={`${className} bg-black/30 px-1 py-0.5 font-mono text-xs border border-white/10`} {...props}>{children}</code>
+                            <code className={`${className} bg-[var(--bg-input)] px-1 py-0.5 font-mono text-xs border border-[var(--border-color)]`} {...props}>{children}</code>
                           )
                         }}
                       >{msg.text}</ReactMarkdown>
@@ -985,10 +1009,10 @@ Encryption: ${r.encryption}
                 ))}
                 {isTyping && (
                   <div className="flex justify-start animate-pulse">
-                    <div className="bg-white/5 p-4 w-12 h-10 flex items-center justify-center gap-1 border border-white/10">
-                      <span className="w-1 h-1 bg-indigo-400 rounded-none animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-none animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-none animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="bg-[var(--bg-card-hover)] p-4 w-12 h-10 flex items-center justify-center gap-1 border border-[var(--border-color)]">
+                      <span className="w-1 h-1 bg-[var(--accent-primary)] rounded-none animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1 h-1 bg-[var(--accent-primary)] rounded-none animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1 h-1 bg-[var(--accent-primary)] rounded-none animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 )}
@@ -996,12 +1020,12 @@ Encryption: ${r.encryption}
               </div>
 
               {/* Context Preview & Chat Input */}
-              <div className="border-t border-white/10 bg-black/40 backdrop-blur-xl">
+              <div className="border-t border-[var(--border-color)] bg-[var(--bg-input)] backdrop-blur-xl">
                 {/* Selected Context Chips */}
                 {selectedRows.length > 0 && (
-                  <div className="p-2 flex flex-wrap gap-2 border-b border-white/5 max-h-32 overflow-y-auto scrollbar-thin">
+                  <div className="p-2 flex flex-wrap gap-2 border-b border-[var(--border-color)] max-h-32 overflow-y-auto scrollbar-thin">
                     {selectedRows.map(row => (
-                      <div key={row.flow} className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-2 py-1 text-[10px] font-mono text-indigo-300 group">
+                      <div key={row.flow} className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-2 py-1 text-[10px] font-mono text-[var(--text-accent)] group">
                         <span className="truncate max-w-[150px]">{row.flow}</span>
                         <button
                           onClick={() => setSelectedRows(prev => prev.filter(r => r.flow !== row.flow))}
@@ -1028,11 +1052,11 @@ Encryption: ${r.encryption}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder={selectedRows.length > 0 ? `Ask about ${selectedRows.length} selected flows...` : "Ask about network anomalies..."}
-                    className="w-full bg-transparent py-4 pl-4 pr-12 text-sm text-slate-200 focus:outline-none focus:bg-white/5 placeholder:text-slate-500 transition-colors rounded-none"
+                    className="w-full bg-transparent py-4 pl-4 pr-12 text-sm text-[var(--text-primary)] focus:outline-none focus:bg-white/5 placeholder:text-[var(--text-secondary)] transition-colors rounded-none"
                   />
                   <button
                     type="submit"
-                    className="absolute right-0 top-0 h-full px-4 text-indigo-400 hover:text-indigo-300 hover:bg-white/5 transition-colors border-l border-white/10 rounded-none"
+                    className="absolute right-0 top-0 h-full px-4 text-indigo-400 hover:text-indigo-300 hover:bg-white/5 transition-colors border-l border-[var(--border-color)] rounded-none"
                   >
                     <Send className="w-4 h-4" />
                   </button>

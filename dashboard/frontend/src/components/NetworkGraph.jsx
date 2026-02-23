@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 
-const NetworkGraph = ({ nodes = [], links = [] }) => {
+const NetworkGraph = ({ nodes = [], links = [], theme = 'dark' }) => {
     const fgRef = useRef();
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+    const isLight = theme === 'light';
 
     useEffect(() => {
         const handleResize = () => {
@@ -84,14 +86,14 @@ const NetworkGraph = ({ nodes = [], links = [] }) => {
     }, [nodes, links]);
 
     return (
-        <div className="w-full h-full bg-slate-950 rounded-xl overflow-hidden border border-white/5 relative">
+        <div className="w-full h-full bg-[var(--bg-main)] rounded-xl overflow-hidden border border-[var(--border-color)] relative">
             <div className="absolute top-4 left-4 z-10 flex gap-2">
-                <div className="bg-black/50 p-2 rounded text-xs text-slate-300 pointer-events-none">
+                <div className="bg-[var(--bg-sidebar)]/80 p-2 rounded text-xs text-[var(--text-secondary)] pointer-events-none">
                     Nodes: {nodes?.length || 0} | Edges: {links?.length || 0}
                 </div>
                 <button
                     onClick={handleZoomToFit}
-                    className="bg-primary/80 hover:bg-primary text-white text-xs px-2 py-1 rounded transition-colors pointer-events-auto"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2 py-1 rounded transition-colors pointer-events-auto"
                 >
                     Recenter
                 </button>
@@ -121,7 +123,7 @@ const NetworkGraph = ({ nodes = [], links = [] }) => {
                     // Draw text *below* it.
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
-                    ctx.fillStyle = 'white'; // Text color
+                    ctx.fillStyle = isLight ? '#1e293b' : 'white'; // Text color
                     ctx.fillText(label, node.x, node.y + 8);
 
                     node.__bckgDimensions = bckgDimensions; // for interaction
@@ -131,13 +133,14 @@ const NetworkGraph = ({ nodes = [], links = [] }) => {
                     const bckgDimensions = node.__bckgDimensions;
                     bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
                 }}
-                linkColor={() => "#ffffff33"}
-                linkWidth={link => Math.log(link.value + 1) * 1.5} // Log scale for width
-                linkDirectionalArrowLength={3.5}
+                linkColor={() => isLight ? "#47556944" : "#ffffff33"}
+                linkWidth={link => Math.log(link.value + 1) * 0.5} // Hairline links
+                linkDirectionalArrowLength={3}
                 linkDirectionalArrowRelPos={1}
+                linkDirectionalArrowColor={() => isLight ? "#475569" : "#ffffff"}
                 linkCurvature={link => link.curvature || 0} // Use calculated curvature
                 d3VelocityDecay={0.4} // Increase friction to stop drift
-                backgroundColor="#020617" // match slate-950
+                backgroundColor={isLight ? "#f1f5f9" : "#020617"}
                 cooldownTicks={100} // Stop simulation after 100 ticks to stabilize
                 onNodeClick={node => {
                     // Center view on node

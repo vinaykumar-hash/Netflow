@@ -1,12 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Fustat:wght@200..800&display=swap');
 @import "tailwindcss";
 
+:root {
+  --bg-main: #0f172a;
+  --bg-sidebar: #0b0f19;
+  --bg-card: rgba(17, 24, 39, 0.4);
+  --bg-card-hover: rgba(255, 255, 255, 0.02);
+  --bg-header: #0b0f19;
+  --bg-input: rgba(0, 0, 0, 0.4);
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-accent: #ffffff;
+  --success-text: #34d399;
+  --warning-text: #fbbf24;
+  --danger-text: #f87171;
+  --border-color: rgba(255, 255, 255, 0.02);
+  --accent-primary: #6366f1;
+  --scrollbar-thumb: #3730a3;
+  --scrollbar-track: #0b0f19;
+}
+
+.light-theme {
+  --bg-main: #f1f5f9;
+  --bg-sidebar: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-card-hover: rgba(0, 0, 0, 0.02);
+  --bg-header: #ffffff;
+  --bg-input: rgba(255, 255, 255, 0.9);
+  --text-primary: #000000;
+  --text-secondary: #475569;
+  --text-accent: #000000;
+  --success-text: #059669;
+  --warning-text: #d97706;
+  --danger-text: #e11d48;
+  --border-color: rgba(0, 0, 0, 0.02);
+  --accent-primary: #4f46e5;
+  --scrollbar-thumb: #94a3b8;
+  --scrollbar-track: #f1f5f9;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
   font-family: 'Fustat', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .fustat {
@@ -19,7 +58,7 @@ body {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3730a3 #0b0f19;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 /* Chrome / Edge / Safari */
@@ -29,19 +68,19 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0b0f19;
-  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--scrollbar-track);
+  border-left: 1px solid var(--border-color);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3730a3;
+  background: var(--scrollbar-thumb);
   border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4f46e5;
+  background: var(--accent-primary);
 }
 
 ::-webkit-scrollbar-corner {
-  background: #0b0f19;
+  background: var(--scrollbar-track);
 }
