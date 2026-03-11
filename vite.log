@@ -3,23 +3,8 @@
 > vite --host 0.0.0.0
 
 
-  VITE v5.4.21  ready in 257 ms
+  VITE v5.4.21  ready in 265 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.1.12:5173/
   ➜  press h + enter to show help
-1:00:58 AM [vite] hmr update /src/index.css
-1:01:11 AM [vite] hmr update /src/App.jsx, /src/index.css
-1:01:22 AM [vite] hmr update /src/index.css
-1:02:48 AM [vite] hmr update /src/App.jsx, /src/index.css
-1:03:10 AM [vite] hmr update /src/App.jsx, /src/index.css
-1:06:19 AM [vite] hmr update /src/index.css
-1:08:19 AM [vite] hmr update /src/index.css
-1:08:40 AM [vite] hmr update /src/index.css
-1:08:42 AM [vite] hmr update /src/components/NetworkGraph.jsx, /src/index.css
-1:10:29 AM [vite] hmr update /src/index.css
-1:10:31 AM [vite] hmr update /src/components/NetworkGraph.jsx, /src/index.css
-1:10:47 AM [vite] hmr update /src/App.jsx, /src/index.css
-1:12:04 AM [vite] hmr update /src/index.css
-1:12:06 AM [vite] hmr update /src/App.jsx, /src/index.css
-1:12:36 AM [vite] hmr update /src/App.jsx, /src/index.css

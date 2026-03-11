@@ -76,6 +76,11 @@ def check_prerequisites():
     else:
         warn("arpspoof not found — ARP spoofing mode unavailable. Install with:  sudo apt install dsniff")
 
+    if shutil.which("arp-scan"):
+        ok(f"arp-scan found at {shutil.which('arp-scan')}")
+    else:
+        warn("arp-scan not found — device discovery will be disabled. Install with:  sudo apt install arp-scan")
+
     if missing:
         err(f"\nMissing required tools: {', '.join(missing)}. Please install them and re-run setup.")
         sys.exit(1)

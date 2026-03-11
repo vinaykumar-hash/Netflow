@@ -39,6 +39,9 @@ def start():
     # 3. Start Live Capture
     import shutil
     tshark_path = shutil.which("tshark")
+    if not tshark_path and os.path.exists("/usr/bin/tshark"):
+        tshark_path = "/usr/bin/tshark"
+        
     if tshark_path:
         print("Launching Live Capture (tshark)...")
         capture_proc = subprocess.Popen(

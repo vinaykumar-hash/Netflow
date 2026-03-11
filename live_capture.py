@@ -195,17 +195,25 @@ def main():
                     # check if the packet has src or dst in targets
                     target_ips = [t['ip'] for t in active_targets] if isinstance(active_targets[0], dict) else active_targets
                     if processed["src_ip"] not in target_ips and processed["dst_ip"] not in target_ips:
+                        # Dropped by active targets filtering
+                        print(f"Dropped: {processed['src_ip']} -> {processed['dst_ip']}", flush=True)
                         continue 
 
-                print(processed)
+                print(processed, flush=True)
                 try:
                     packet_queue.put_nowait(processed)
                 except queue.Full:
-                    # print("Queue full!", file=sys.stderr)``
+                    # print("Queue full!", file=sys.stderr)
                     pass
 
-            except Exception:
+            except Exception as e:
+                print(f"Exception parsing row: {e}", file=sys.stderr)
                 continue
+
+        print("tshark process standard output closed.")
+        process.wait()
+        if process.returncode != 0:
+            print(f"tshark exited with code {process.returncode}", file=sys.stderr)
 
     except KeyboardInterrupt:
         print("\nStopping Live Capture.")

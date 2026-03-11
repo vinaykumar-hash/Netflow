@@ -90,7 +90,7 @@ class NetworkDevicesView(APIView):
                 if match: host_ip = match.group(1)
             except Exception: pass
 
-            result = subprocess.run(['arp', '-a'], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(['sudo', '-n', 'arp-scan', '--localnet'], capture_output=True, text=True, timeout=10)
             output = result.stdout
             devices = []
             
@@ -99,7 +99,8 @@ class NetworkDevicesView(APIView):
 
             for line in output.split('\n'):
                 if not line.strip(): continue
-                match = re.search(r'\(([\d\.]+)\) at ([\w:]+)', line)
+                # arp-scan format: <IP>\t<MAC>\t<Manufacturer>
+                match = re.search(r'^((?:[0-9]{1,3}\.){3}[0-9]{1,3})\s+([0-9a-fA-F:]+)', line)
                 if match:
                     ip = match.group(1)
                     if ip != host_ip: 
